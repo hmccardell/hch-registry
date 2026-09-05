@@ -6,8 +6,44 @@
   --color-hch-cream: #fbfbf8;
   --color-hch-mint: #11ffb1;
   --color-hch-mint-dark: #006d4b;
+  --color-hch-orange: #b45309;
   --color-hch-muted-1: #5b5a70;
   --color-hch-muted-2: #85849a;
   --color-hch-muted-3: #a6a5b8;
   --color-hch-border: #cbcbd5;
+}
+
+/* Old-school Windows indeterminate progress bar, in green. Shown on the login
+   screen while a cold-started (sleeping) server wakes up. */
+.retro-progress {
+  height: 22px;
+  padding: 3px;
+  background: #c0c0c0;
+  border: 2px solid;
+  border-color: #808080 #ffffff #ffffff #808080; /* sunken bevel */
+}
+.retro-progress__track {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  background: #ffffff;
+}
+/* A green fill that grows left-to-right in block-sized steps. The repeating
+   gradient draws the individual blocks; steps() makes the width advance one
+   block at a time. It fills over ~16s, then loops. */
+.retro-progress__fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0;
+  background: repeating-linear-gradient(90deg, #06b025 0 12px, transparent 12px 15px);
+  animation: retro-progress-fill 16s steps(24) infinite;
+}
+@keyframes retro-progress-fill {
+  from { width: 0; }
+  to { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .retro-progress__fill { animation-duration: 32s; }
 }

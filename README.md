@@ -1,169 +1,120 @@
 # Hub City Hackers — Member Registry
 
-Base scaffold for the HCH member directory: a Google Form feeds a Google Sheet
-(private, has real emails/phones), a small server filters that sheet down to
-what each member agreed to make public, and a React app renders the result.
+A Google Form feeds a private Google Sheet (real emails and phone numbers); a
+small Express server filters that sheet down to what each member agreed to show
+publicly; a React app renders the result behind a shared password.
 
 ```
-frontend/   Vite + React + Tailwind — renders the public directory
-server/     Express — reads the raw sheet, applies the Q8-10 privacy rules, serves JSON
+frontend/   Vite + React + Tailwind — the directory UI
+server/     Express — reads the sheet, applies the privacy rules, serves JSON,
+            and (in production) serves the built frontend
 ```
 
-The frontend never talks to Google Sheets directly. It only ever sees what
-`server` decides to expose.
+The frontend never touches Google Sheets. It only ever sees what the server
+chooses to expose.
 
-## Setup
+## One-time Google setup
 
-This walks through everything needed to get real data flowing, in order.
-Steps 2-5 are all inside [Google Cloud Console](https://console.cloud.google.com/)
-and only need to be done once.
+The server reads the sheet as a **service account** — a robot Google identity
+that can see one specific sheet and nothing else.
 
-### 1. Create the Google Form
+1. **Form → Sheet.** Build the form in Google Forms. Under **Settings →
+   Responses**, turn on **Collect email addresses** (this gives each submitter a
+   self-service "edit your response" link — no custom login needed for edits).
+   In the form's **Responses** tab, click the Sheets icon to create the linked
+   spreadsheet. That sheet is the private source of truth.
+2. **Cloud project.** At [console.cloud.google.com](https://console.cloud.google.com/),
+   create a project (e.g. `hch-registry`) and select it.
+3. **Enable the API.** *APIs & Services → Library →* search **Google Sheets
+   API** *→ Enable*.
+4. **Service account + key.** *APIs & Services → Credentials → Create
+   Credentials → Service account*. Skip the optional role grant. Open the new
+   account → **Keys → Add Key → Create new key → JSON**. A `.json` file
+   downloads — treat it like a password. You need two fields from it:
+   `client_email` and `private_key`.
+5. **Share the sheet.** Open the response sheet → **Share** → paste the
+   `client_email` → role **Viewer** → untick "Notify" → Share. Without this the
+   server gets a 403, even with a valid key.
 
-Use the form draft to build it in Google Forms. In the form editor go to
-**Settings → Responses** and turn on **"Collect email addresses"** — this is
-what gives each submitter a self-service "edit your response" link later, so
-you don't need to build any custom login/auth for people to update their info.
+## Local development
 
-Then, in the **Responses** tab of the form, click the green Sheets icon
-("View responses in Sheets" / "Create Spreadsheet") to create the linked
-Google Sheet. This sheet is your private source of truth — it has everyone's
-real email/phone regardless of what they chose to make public.
-
-### 2. Create a Google Cloud project
-
-The server authenticates to Google as a "service account" — a robot identity
-that can read one specific sheet, nothing else on your Google account.
-
-1. Go to [console.cloud.google.com](https://console.cloud.google.com/).
-2. Top-left, click the project dropdown → **New Project**.
-3. Name it something like `hch-registry` → **Create**.
-4. Make sure that project is selected in the dropdown before continuing.
-
-### 3. Enable the Google Sheets API
-
-1. In the left sidebar (or search bar at top), go to **APIs & Services → Library**.
-2. Search for **Google Sheets API**.
-3. Click it, then click **Enable**.
-
-### 4. Create the service account and its key
-
-1. Go to **APIs & Services → Credentials**.
-2. Click **+ Create Credentials → Service account**.
-3. Give it any name, e.g. `hch-registry-sheets-reader` → **Create and Continue**.
-4. You can skip granting it a project role (click **Continue**, then **Done**)
-   — access will come from sharing the sheet directly with it, not from a
-   project-wide role.
-5. On the Credentials page, click into the service account you just made.
-6. Go to the **Keys** tab → **Add Key → Create new key** → choose **JSON** → **Create**.
-7. A `.json` file downloads. **Treat this file like a password** — don't
-   commit it, don't share it. Open it in a text editor; you'll need two
-   fields out of it in a minute:
-   - `"client_email"` — a long address ending in `.iam.gserviceaccount.com`
-   - `"private_key"` — a long string starting with `-----BEGIN PRIVATE KEY-----`
-
-### 5. Share the Sheet with the service account
-
-1. Open the response Sheet from step 1.
-2. Click **Share** (top right).
-3. Paste in the `client_email` value from the downloaded JSON.
-4. Set its role to **Viewer**.
-5. Untick "Notify people" (it's a robot account, no need to email it) → **Share**.
-
-Without this step the server will get a permissions error — enabling the API
-and having a key isn't enough, the sheet itself must be shared with that exact
-service account email.
-
-### 6. Configure the server's `.env`
+Two terminals. The frontend proxies `/api` to the server, so both sides run on
+one origin (matching production) and there is no CORS or frontend env to set.
 
 ```bash
+# terminal 1 — server
 cd server
-cp .env.example .env
-```
-
-Open `server/.env` and fill in each value:
-
-| Variable | What goes here |
-| --- | --- |
-| `PORT` | Leave as `4000` unless that port is already in use on your machine. |
-| `CORS_ORIGIN` | Leave as `http://localhost:5173` for local dev — it's the URL of the frontend, used so the browser will accept the server's responses. |
-| `GOOGLE_SHEET_ID` | From the Sheet's URL: `https://docs.google.com/spreadsheets/d/`**`THIS_PART`**`/edit`. Copy just that long ID string, nothing else. |
-| `GOOGLE_SHEET_RANGE` | The name of the tab (bottom of the Sheet) that holds form responses. Google names it `Form Responses 1` by default — check the actual tab name in your sheet and match it exactly, it's case-sensitive. |
-| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | The `client_email` value from the downloaded JSON key, pasted exactly as-is. |
-| `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | The `private_key` value from the downloaded JSON key, pasted exactly as-is — **including** the `-----BEGIN PRIVATE KEY-----` / `-----END PRIVATE KEY-----` lines and the literal `\n` characters in between. Don't convert those `\n`s into real line breaks; the server does that conversion itself. It's normal for this to be one very long line in the `.env` file. |
-
-Then install and run it:
-
-```bash
+cp .env.example .env      # then fill it in (table below)
 npm install
-npm run dev
-```
+npm run dev               # http://localhost:4000
 
-Visit http://localhost:4000/api/directory in your browser — you should see a
-JSON array (empty `[]` is fine if the form has no public-visibility responses
-yet). An error there means one of the values above is off; see
-Troubleshooting below.
-
-### 7. Configure the frontend's `.env`
-
-```bash
+# terminal 2 — frontend
 cd frontend
-cp .env.example .env
-```
-
-| Variable | What goes here |
-| --- | --- |
-| `VITE_API_URL` | The URL where the server from step 6 is running. Leave as `http://localhost:4000` for local dev. |
-
-Then install and run it:
-
-```bash
 npm install
-npm run dev
+npm run dev               # http://localhost:5173
 ```
 
-### 8. Open it
+`server/.env`:
 
-http://localhost:5173
+| Variable | Value |
+| --- | --- |
+| `PORT` | `4000` unless taken. |
+| `AUTH_USER` / `AUTH_PASSWORD` | The shared login. Any values locally. |
+| `AUTH_SECRET` | Any string locally. Generate a real one for prod: `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
+| `GOOGLE_SHEET_ID` | The ID in the sheet URL: `.../spreadsheets/d/`**`THIS`**`/edit`. |
+| `GOOGLE_SHEET_RANGE` | The response tab's name, exactly (default `Form Responses 1`). |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | `client_email` from the JSON key. |
+| `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | `private_key` from the JSON key, pasted as-is (keep the `BEGIN`/`END` lines; real newlines or literal `\n` both work). |
 
-### Troubleshooting
+Check <http://localhost:4000/health> → `{"ok":true}`. A `500` from
+`/api/directory` means a `GOOGLE_*` value is off — the server terminal shows the
+real error.
 
-- **"Failed to load directory" in the browser, or a 500 from `/api/directory`**
-  — check the server's terminal output for the real error.
-- **Permission / 403 error from Google** — the sheet hasn't been shared with
-  the service account's exact `client_email` (step 5), or you're pointing at
-  the wrong `GOOGLE_SHEET_ID`.
-- **"Unable to parse range" error** — `GOOGLE_SHEET_RANGE` doesn't match the
-  actual tab name in the sheet (check for a trailing space or a different
-  number, e.g. `Form Responses 2`).
-- **A JWT / "invalid_grant" / signature error** — usually means
-  `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` got mangled when pasted (missing the
-  `\n` sequences, or they got converted into real newlines by an editor).
-  Re-copy it straight from the JSON file as one line.
+## Deploy to Render
+
+One Node web service builds the frontend and serves it from the same process
+that exposes `/api` — single origin, no CORS.
+
+1. Push this repo to GitHub.
+2. In Render: **New → Blueprint**, point it at the repo. It reads
+   [`render.yaml`](render.yaml) and creates the `hch-registry` service
+   (build `npm run build`, start `npm start`).
+3. When prompted, set the secrets: `AUTH_PASSWORD`, `GOOGLE_SHEET_ID`,
+   `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`.
+   `AUTH_SECRET` is generated; `NODE_ENV`, `AUTH_USER`, and `GOOGLE_SHEET_RANGE`
+   have defaults in the blueprint.
+4. Deploy. The app is at `https://<service>.onrender.com`.
+
+Notes:
+
+- With `NODE_ENV=production` the server **refuses to start** unless
+  `AUTH_PASSWORD` and `AUTH_SECRET` are set, so it can never ship on the
+  built-in dev defaults.
+- Render's free plan sleeps the service after ~15 min idle; the next request
+  wakes it (a slow first load).
+- The directory response is cached in memory for 60s, so an edit or deletion in
+  the sheet can take up to a minute to appear.
 
 ## How the privacy filtering works
 
-`server/src/transform.js` maps sheet columns by header text (matching the
-live form's exact question wording), then `toPublicMember()`:
+`server/src/transform.js` maps sheet columns by **header text** (the form's
+exact question wording), then `toPublicMember()`:
 
-- Everyone who submits the form ends up in the public directory — there's no
-  "keep me out entirely" question on the live form, so submitting is itself
-  the opt-in.
-- Nulls out `email` unless they answered "Yes, show my email".
-- Nulls out `phone` unless they answered "Yes" to the phone question.
+- Everyone who submits is listed — the live form has no "keep me out" option, so
+  submitting is the opt-in.
+- `email` is nulled unless the member answered "Yes, show my email".
+- `phone` is nulled unless they answered "Yes" to the phone question.
 
-**If you reword, add, or remove a question on the live form, `HEADER_TO_FIELD`
-in that file will stop matching it** — the field just silently disappears
-from the API response instead of erroring, so it's easy to miss. Keep the
-keys in `HEADER_TO_FIELD` in sync with the form's actual current wording.
+**Rewording, adding, or removing a form question breaks its mapping in
+`HEADER_TO_FIELD`** — the field then silently vanishes from the API rather than
+erroring. Keep those keys in sync with the live form.
 
 ## Not built yet (out of scope for this base)
 
-- Any tiered visibility (e.g. a "members-only" authenticated view) — the live
-  form has no opt-out-of-the-directory question, so everyone who submits is public.
-- A way to message someone who's hidden their email/phone.
-- Splitting a checkbox question's "Other" free-text answer from its real
-  selections — right now a comma inside an "Other" answer gets misread as
-  multiple values (see `splitList` in `server/src/transform.js`).
-- Editing the "collect email addresses" edit-link mechanism into the app itself
-  (currently Google handles it entirely on the Forms side).
+- Tiered visibility (e.g. an authenticated members-only view) — the form has no
+  opt-out question, so every submitter is public.
+- A way to contact someone who hid their email and phone.
+- Splitting a checkbox "Other" free-text answer from real selections — a comma
+  inside an "Other" answer is currently misread as multiple values (`splitList`
+  in `server/src/transform.js`).
+- Rate limiting on the login endpoint.
