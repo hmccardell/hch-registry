@@ -1,0 +1,775 @@
+<title>Member Row & Detail Concepts</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #050507;
+    --surface: #0F0F14;
+    --surface-2: #15151d;
+    --surface-3: #1b1b24;
+    --border: rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.16);
+    --text-primary: #FFFFFF;
+    --text-secondary: #C9CBD3;
+    --text-tertiary: #9A9DAA;
+    --accent-purple: #8B5CF6;
+    --accent-purple-deep: #6D28D9;
+    --accent-teal: #2DD4BF;
+    --accent-teal-light: #5EEAD4;
+    --gradient-accent: linear-gradient(90deg, #8B5CF6, #2DD4BF);
+    --stage-idea: #6B6E78;
+    --shadow-lift: 0 12px 32px rgba(0,0,0,0.5);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: radial-gradient(1100px 560px at 18% -8%, rgba(139,92,246,0.14), transparent 60%),
+                radial-gradient(900px 520px at 100% 0%, rgba(45,212,191,0.10), transparent 55%),
+                var(--bg);
+    color: var(--text-primary);
+    font-family: "Sora", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+
+  .mono { font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+
+  a { color: var(--accent-teal-light); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  :focus-visible { outline: 2px solid var(--accent-teal); outline-offset: 2px; border-radius: 4px; }
+
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 56px 28px 96px; }
+
+  /* ---------- header ---------- */
+  .page-header { padding-bottom: 40px; border-bottom: 1px solid var(--border); margin-bottom: 56px; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--text-tertiary); margin: 0 0 14px;
+  }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 12px; text-wrap: balance; }
+  .page-header p { max-width: 62ch; color: var(--text-secondary); margin: 0; font-size: 15px; }
+
+  /* ---------- section scaffolding ---------- */
+  .section { margin-bottom: 88px; }
+  .section:last-child { margin-bottom: 0; }
+  .section-head { margin-bottom: 28px; }
+  .section-head h2 { font-size: 22px; font-weight: 600; margin: 0 0 8px; }
+  .section-head p { color: var(--text-secondary); font-size: 14.5px; max-width: 68ch; margin: 0; }
+  .hint {
+    display: inline-flex; align-items: center; gap: 6px; margin-top: 14px;
+    font-size: 13px; color: var(--text-tertiary); font-family: "IBM Plex Mono", monospace;
+  }
+  .hint svg { width: 14px; height: 14px; }
+
+  .variant { margin-bottom: 36px; }
+  .variant:last-child { margin-bottom: 0; }
+  .variant-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+    margin-bottom: 14px; flex-wrap: wrap;
+  }
+  .variant-title { display: flex; align-items: baseline; gap: 10px; }
+  .variant-letter {
+    font-family: "IBM Plex Mono", monospace; font-size: 13px; font-weight: 600;
+    color: var(--bg); background: var(--gradient-accent);
+    width: 22px; height: 22px; border-radius: 6px; display: inline-flex;
+    align-items: center; justify-content: center; flex: none;
+  }
+  .variant-title h3 { font-size: 16.5px; font-weight: 600; margin: 0; }
+  .variant-best { font-size: 13px; color: var(--text-tertiary); max-width: 46ch; text-align: right; }
+  .variant-best b { color: var(--text-secondary); font-weight: 500; }
+
+  .surface-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  }
+
+  /* ---------- shared icon buttons ---------- */
+  .icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 8px; color: var(--text-secondary);
+    background: transparent; border: 1px solid transparent; flex: none;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .icon-btn svg { width: 16px; height: 16px; }
+  a.icon-btn:hover { background: var(--surface-3); color: var(--accent-teal-light); border-color: var(--border-strong); text-decoration: none; }
+  .icon-btn.disabled { color: var(--text-tertiary); opacity: 0.45; cursor: default; }
+
+  /* ---------- avatar ---------- */
+  .avatar {
+    width: 38px; height: 38px; border-radius: 50%; flex: none; display: flex;
+    align-items: center; justify-content: center; font-size: 13px; font-weight: 600;
+    color: var(--text-primary); background: var(--surface-3);
+    border: 1.5px solid transparent;
+    background-image: linear-gradient(var(--surface-3), var(--surface-3)), var(--gradient-accent);
+    background-origin: border-box; background-clip: padding-box, border-box;
+  }
+  .avatar.lg { width: 52px; height: 52px; font-size: 16px; }
+
+  /* ---------- tags ---------- */
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag {
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px; padding: 4px 9px;
+    border-radius: 100px; background: var(--surface-3); color: var(--text-secondary);
+    white-space: nowrap; border: 1px solid var(--border);
+  }
+  .tag.more { color: var(--text-tertiary); background: transparent; }
+  .tag.need { color: var(--accent-teal-light); border-color: rgba(45,212,191,0.3); background: rgba(45,212,191,0.08); }
+  .tag.offer { color: #C7B8FB; border-color: rgba(139,92,246,0.35); background: rgba(139,92,246,0.1); }
+
+  /* ---------- stage ---------- */
+  .stage { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); }
+  .stage-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .stage-dot.idea { background: var(--stage-idea); }
+  .stage-dot.building { background: var(--accent-purple); }
+  .stage-dot.launched { background: var(--accent-teal); }
+  .stage-dot.fundraising { background: var(--gradient-accent); }
+
+  /* =====================================================
+     VARIANT A — compact scan row
+     ===================================================== */
+  .rowsA { display: flex; flex-direction: column; }
+  .rowA {
+    display: flex; align-items: center; gap: 14px; padding: 12px 18px;
+    border-top: 1px solid var(--border); cursor: pointer; position: relative;
+    transition: background .15s ease;
+  }
+  .rowA:first-child { border-top: none; }
+  .rowA::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: var(--gradient-accent); opacity: 0; transition: opacity .15s ease;
+  }
+  .rowA:hover, .rowA:focus-visible { background: var(--surface-2); }
+  .rowA:hover::before, .rowA:focus-visible::before { opacity: 1; }
+  .rowA .avatar { width: 32px; height: 32px; font-size: 11.5px; }
+  .rowA .name-block { flex: none; width: 150px; min-width: 0; }
+  .rowA .name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rowA .handle { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--text-tertiary); }
+  .rowA .tags { flex: 1; min-width: 0; }
+  .rowA .stage { flex: none; width: 96px; }
+  .rowA .rail { flex: none; display: flex; align-items: center; gap: 2px; }
+  .rowA .chev { color: var(--text-tertiary); width: 16px; height: 16px; margin-left: 4px; }
+
+  /* =====================================================
+     VARIANT B — two-line context row
+     ===================================================== */
+  .rowsB { display: flex; flex-direction: column; }
+  .rowB {
+    display: flex; flex-direction: column; gap: 8px; padding: 16px 20px;
+    border-top: 1px solid var(--border); cursor: pointer; transition: background .15s ease;
+  }
+  .rowB:first-child { border-top: none; }
+  .rowB:hover, .rowB:focus-visible { background: var(--surface-2); }
+  .rowB .line1 { display: flex; align-items: center; gap: 12px; }
+  .rowB .avatar { width: 40px; height: 40px; font-size: 14px; }
+  .rowB .id-block { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .rowB .name { font-weight: 600; font-size: 15.5px; }
+  .rowB .handle { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--text-tertiary); }
+  .rowB .line2 { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-left: 52px; flex-wrap: wrap; }
+  .rowB .need-preview { font-size: 12.5px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
+  .rowB .need-preview b { color: var(--text-secondary); font-weight: 500; }
+
+  /* =====================================================
+     VARIANT C — split row with action rail
+     ===================================================== */
+  .rowsC { display: flex; flex-direction: column; }
+  .rowC {
+    display: flex; align-items: center; gap: 16px; padding: 14px 18px;
+    border-top: 1px solid var(--border); transition: background .15s ease;
+  }
+  .rowC:first-child { border-top: none; }
+  .rowC:hover { background: var(--surface-2); }
+  .rowC .main { flex: 1; min-width: 0; cursor: pointer; display: flex; align-items: center; gap: 14px; }
+  .rowC .id-block { min-width: 0; width: 200px; flex: none; }
+  .rowC .name { font-weight: 600; font-size: 14.5px; }
+  .rowC .handle { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--text-tertiary); }
+  .rowC .mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .rowC .proj { font-size: 12.5px; color: var(--text-tertiary); display: flex; align-items: center; gap: 8px; }
+  .rowC .proj b { color: var(--text-secondary); font-weight: 500; }
+  .rowC .divider { width: 1px; align-self: stretch; background: var(--border); flex: none; }
+  .rowC .rail { flex: none; display: flex; align-items: center; gap: 4px; }
+  .rowC .chev-btn { flex: none; }
+  .rowC .chev-btn svg { color: var(--text-tertiary); width: 16px; height: 16px; }
+
+  /* =====================================================
+     DETAIL CONTENT (shared building blocks)
+     ===================================================== */
+  .detail-label {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-tertiary); margin: 0 0 10px;
+  }
+  .detail-block + .detail-block { margin-top: 22px; }
+  .contact-list { display: flex; flex-direction: column; gap: 10px; }
+  .contact-row { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--text-secondary); }
+  .contact-row .icon-btn { width: 28px; height: 28px; background: var(--surface-3); border-color: var(--border); }
+  .contact-row a.contact-value:hover { text-decoration: underline; }
+  .contact-value { color: var(--text-secondary); }
+  .contact-row.disabled { color: var(--text-tertiary); }
+
+  .project-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 16px; background: var(--surface-2);
+  }
+  .project-card .proj-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+  .project-card .proj-name { font-size: 15px; font-weight: 600; }
+  .project-card .proj-desc { font-size: 13.5px; color: var(--text-secondary); margin: 0 0 10px; }
+  .project-card .proj-link { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; }
+
+  .notes-text { font-size: 13.5px; color: var(--text-secondary); margin: 0; line-height: 1.6; }
+  .needs-detail { font-size: 13px; color: var(--text-tertiary); margin: 10px 0 0; line-height: 1.55; }
+
+  .detail-header {
+    display: flex; align-items: center; gap: 14px; padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .detail-header .id-block { flex: 1; min-width: 0; }
+  .detail-header .name { font-size: 18px; font-weight: 700; }
+  .detail-header .handle { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; color: var(--text-tertiary); }
+  .detail-header .quick-actions { display: flex; align-items: center; gap: 4px; flex: none; }
+  .close-btn { color: var(--text-secondary); }
+  .close-btn:hover { color: var(--text-primary); }
+
+  /* Modal (variant 1) two-column body */
+  .detail-body-2col { display: grid; grid-template-columns: 220px 1fr; gap: 28px; padding: 22px 24px; }
+  @media (max-width: 640px) { .detail-body-2col { grid-template-columns: 1fr; } }
+
+  /* Drawer (variant 2) single column sectioned body */
+  .detail-body-1col { padding: 22px 24px; display: flex; flex-direction: column; gap: 22px; }
+
+  /* =====================================================
+     SECTION 1 — global click-through modal
+     ===================================================== */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(2,2,4,0.82);
+    display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 100;
+    opacity: 0; pointer-events: none; transition: opacity .18s ease;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: auto; }
+  .modal-panel {
+    width: 100%; max-width: 760px; max-height: 85vh; overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--border-strong); border-radius: 14px;
+    box-shadow: var(--shadow-lift); transform: translateY(8px) scale(0.98); transition: transform .18s ease;
+  }
+  .modal-overlay.open .modal-panel { transform: translateY(0) scale(1); }
+
+  /* =====================================================
+     SECTION 2 — self-contained demo frames
+     ===================================================== */
+  .demo-frame {
+    position: relative; height: 460px; overflow: hidden; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 12px;
+  }
+  .demo-backdrop { position: absolute; inset: 0; padding: 18px; opacity: 0.4; }
+  .demo-backdrop .ghost-row {
+    display: flex; align-items: center; gap: 10px; padding: 12px 6px; border-top: 1px solid var(--border);
+  }
+  .demo-backdrop .ghost-row:first-child { border-top: none; }
+  .demo-backdrop .ghost-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--surface-3); flex: none; }
+  .demo-backdrop .ghost-line { height: 9px; border-radius: 5px; background: var(--surface-3); }
+
+  .demo-scrim {
+    position: absolute; inset: 0; background: rgba(2,2,4,0); transition: background .18s ease; pointer-events: none;
+  }
+  .demo-frame.showing .demo-scrim { background: rgba(2,2,4,0.55); }
+
+  .demo-modal-panel {
+    position: absolute; top: 50%; left: 50%; width: min(560px, 88%);
+    max-height: 84%; overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--border-strong); border-radius: 12px;
+    box-shadow: var(--shadow-lift);
+    transform: translate(-50%, -50%) scale(0.97); opacity: 0; transition: opacity .18s ease, transform .18s ease;
+    pointer-events: none;
+  }
+  .demo-frame.showing .demo-modal-panel { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
+
+  .demo-drawer-panel {
+    position: absolute; top: 0; right: 0; bottom: 0; width: min(340px, 90%);
+    background: var(--surface); border-left: 1px solid var(--border-strong);
+    box-shadow: var(--shadow-lift); overflow-y: auto;
+    transform: translateX(100%); transition: transform .2s ease;
+  }
+  .demo-frame.showing .demo-drawer-panel { transform: translateX(0); }
+
+  .reopen-wrap {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity .18s ease;
+  }
+  .demo-frame:not(.showing) .reopen-wrap { opacity: 1; pointer-events: auto; }
+
+  .reopen-btn {
+    font-family: "IBM Plex Mono", monospace; font-size: 12.5px; color: var(--text-primary);
+    background: var(--surface-3); border: 1px solid var(--border-strong); border-radius: 100px;
+    padding: 10px 18px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+  }
+  .reopen-btn:hover { border-color: var(--accent-teal); color: var(--accent-teal-light); }
+  .reopen-btn svg { width: 14px; height: 14px; }
+
+  /* =====================================================
+     Variant 3 — inline expand
+     ===================================================== */
+  .expand-row-wrap { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; }
+  .expand-header {
+    display: flex; align-items: center; gap: 12px; padding: 16px 20px; cursor: pointer;
+  }
+  .expand-header:hover { background: var(--surface-2); }
+  .expand-header .chev { transition: transform .18s ease; color: var(--text-tertiary); }
+  .expand-row-wrap.open .expand-header .chev { transform: rotate(180deg); color: var(--accent-teal-light); }
+  .expand-panel {
+    max-height: 0; overflow: hidden; transition: max-height .22s ease; border-top: 1px solid transparent;
+  }
+  .expand-row-wrap.open .expand-panel { max-height: 640px; border-top-color: var(--border); }
+  .expand-body { padding: 20px 20px 22px 20px; }
+  .expand-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 18px; }
+  @media (max-width: 560px) { .expand-grid { grid-template-columns: 1fr; } }
+
+  /* ---------- takeaway ---------- */
+  .takeaway {
+    border-top: 1px solid var(--border); padding-top: 32px; margin-top: 8px;
+    color: var(--text-secondary); font-size: 14px; max-width: 68ch;
+  }
+  .takeaway b { color: var(--text-primary); }
+  .takeaway .grad-mark { background: var(--gradient-accent); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 600; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important; transition-duration: 0.001ms !important;
+    }
+  }
+
+  @media (max-width: 700px) {
+    .rowB .line2 { padding-left: 0; }
+    .rowA .name-block { width: 110px; }
+    .rowC .id-block { width: 140px; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="page-header">
+    <p class="eyebrow">HCH Member Directory — Layout Concepts</p>
+    <h1>Rows for the list, faster paths to the full profile</h1>
+    <p>Three ways to lay out each member as a row instead of a card, and three ways to surface everything about
+      one member once you click in. All six use real fields from the response sheet — skills, project status,
+      what someone's offering or looking for, and their contact opt-ins — so you're comparing how the data actually
+      reads, not placeholder text.</p>
+  </header>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 1 — LIST LAYOUTS                                      -->
+  <!-- ============================================================ -->
+  <section class="section" id="section-lists">
+    <div class="section-head">
+      <h2>Part 1 — Ways to list members</h2>
+      <p>Same six members, three different bets on what matters most at a glance: raw scannability, what someone
+        needs or offers, or getting straight to contacting them.</p>
+      <span class="hint">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        click any row below to preview that member's full profile
+      </span>
+    </div>
+
+    <div class="variant" id="variant-A">
+      <div class="variant-head">
+        <div class="variant-title"><span class="variant-letter">A</span><h3>Compact scan row</h3></div>
+        <div class="variant-best"><b>Best for:</b> scanning the whole roster fast — one line each, skills first.</div>
+      </div>
+      <div class="surface-card"><div class="rowsA" id="rowsA"></div></div>
+    </div>
+
+    <div class="variant" id="variant-B">
+      <div class="variant-head">
+        <div class="variant-title"><span class="variant-letter">B</span><h3>Two-line context row</h3></div>
+        <div class="variant-best"><b>Best for:</b> matching by need — shows what they're after without a click.</div>
+      </div>
+      <div class="surface-card"><div class="rowsB" id="rowsB"></div></div>
+    </div>
+
+    <div class="variant" id="variant-C">
+      <div class="variant-head">
+        <div class="variant-title"><span class="variant-letter">C</span><h3>Split row, action rail</h3></div>
+        <div class="variant-best"><b>Best for:</b> acting immediately — email or check a link straight from the list.</div>
+      </div>
+      <div class="surface-card"><div class="rowsC" id="rowsC"></div></div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 2 — DETAIL LAYOUTS                                    -->
+  <!-- ============================================================ -->
+  <section class="section" id="section-details">
+    <div class="section-head">
+      <h2>Part 2 — Ways to show one full profile</h2>
+      <p>Same member (Priya Shah) in all three, so the layouts are the only variable. Each one starts open —
+        collapse it and reopen to feel how many clicks it actually costs.</p>
+    </div>
+
+    <div class="variant">
+      <div class="variant-head">
+        <div class="variant-title"><span class="variant-letter">1</span><h3>Modal overlay</h3></div>
+        <div class="variant-best"><b>Best for:</b> one focused read. Dims everything else until you dismiss it.</div>
+      </div>
+      <div class="demo-frame showing" id="demo-modal">
+        <div class="demo-backdrop">
+          <div class="ghost-row"><div class="ghost-avatar"></div><div class="ghost-line" style="width:120px"></div><div class="ghost-line" style="width:80px"></div></div>
+          <div class="ghost-row"><div class="ghost-avatar"></div><div class="ghost-line" style="width:150px"></div><div class="ghost-line" style="width:60px"></div></div>
+          <div class="ghost-row"><div class="ghost-avatar"></div><div class="ghost-line" style="width:100px"></div><div class="ghost-line" style="width:90px"></div></div>
+        </div>
+        <div class="demo-scrim"></div>
+        <div class="demo-modal-panel" id="demo-modal-panel"></div>
+        <div class="reopen-wrap">
+          <button class="reopen-btn" data-reopen="demo-modal">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 12h6M12 9v6"/></svg>
+            Reopen preview
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="variant">
+      <div class="variant-head">
+        <div class="variant-title"><span class="variant-letter">2</span><h3>Slide-over drawer</h3></div>
+        <div class="variant-best"><b>Best for:</b> going profile to profile — the list stays put behind it.</div>
+      </div>
+      <div class="demo-frame showing" id="demo-drawer">
+        <div class="demo-backdrop">
+          <div class="ghost-row"><div class="ghost-avatar"></div><div class="ghost-line" style="width:120px"></div><div class="ghost-line" style="width:80px"></div></div>
+          <div class="ghost-row"><div class="ghost-avatar"></div><div class="ghost-line" style="width:150px"></div><div class="ghost-line" style="width:60px"></div></div>
+          <div class="ghost-row"><div class="ghost-avatar"></div><div class="ghost-line" style="width:100px"></div><div class="ghost-line" style="width:90px"></div></div>
+        </div>
+        <div class="demo-scrim"></div>
+        <div class="demo-drawer-panel" id="demo-drawer-panel"></div>
+        <div class="reopen-wrap">
+          <button class="reopen-btn" data-reopen="demo-drawer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 12h6M12 9v6"/></svg>
+            Reopen preview
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="variant">
+      <div class="variant-head">
+        <div class="variant-title"><span class="variant-letter">3</span><h3>Inline expand</h3></div>
+        <div class="variant-best"><b>Best for:</b> zero navigation — nothing opens on top of the list, it just grows.</div>
+      </div>
+      <div class="expand-row-wrap open" id="expand-demo"></div>
+    </div>
+
+    <p class="takeaway">
+      If you want one recommendation: <b>B + 3</b> — the two-line context row paired with inline expand —
+      gets you closest to "see it without clicking" for both the list and the detail. <b>A + 1</b> reads
+      cleaner if the roster gets large and occasional full-modal dives are fine. C's action rail is worth
+      keeping regardless of which detail style wins — <span class="grad-mark">letting people email or open a
+      link straight from the row</span> is the actual fewest-clicks move, detail view or not.
+    </p>
+  </section>
+
+</div>
+
+<!-- global modal used by Part 1 row clicks -->
+<div class="modal-overlay" id="global-modal">
+  <div class="modal-panel" id="global-modal-panel"></div>
+</div>
+
+<script>
+  const ICONS = {
+    mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3.5 6.5L12 13l8.5-6.5"/></svg>',
+    phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5h3l1.3 4.2L9 9.5a10.5 10.5 0 0 0 5.5 5.5l1.8-2.3 4.2 1.3v3a1.8 1.8 0 0 1-1.9 1.8C10.7 18.3 5.7 13.3 5.2 5.9A1.8 1.8 0 0 1 7 3.5z"/></svg>',
+    chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 5.5h15a1 1 0 0 1 1 1V15a1 1 0 0 1-1 1H10l-4 3.5V16H4.5a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1z"/></svg>',
+    link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4.5h5.5V10"/><path d="M19.5 4.5L10 14"/><path d="M17 13v5.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 18.5v-11A1.5 1.5 0 0 1 4.5 6H10"/></svg>',
+    chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+    close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  };
+
+  const MEMBERS = [
+    { id: 'priya', name: 'Priya Shah', handle: 'priyash', initials: 'PS',
+      skills: ['Frontend dev', 'Design / UI-UX'],
+      project: { name: 'Loopline', stage: 'Building', desc: 'A shared playlist app for co-working sessions', link: 'loopline.app' },
+      helpOffered: ['Code review', 'Mentoring'],
+      needs: ['Beta users / testers', 'Marketing / design help'],
+      needsDetail: 'Would love feedback on the onboarding flow.',
+      bio: 'Free most Tuesday nights if anyone wants to pair.',
+      email: 'priya.shah@example.com', phone: '555-0142', link: 'github.com/priyashah' },
+    { id: 'marcus', name: 'Marcus Webb', handle: 'mwebb', initials: 'MW',
+      skills: ['Backend dev', 'DevOps / infrastructure'],
+      project: null,
+      helpOffered: ['Freelance / contract work', 'Intros & connections'],
+      needs: ['Technical co-founder'],
+      needsDetail: 'Open to short contracts, backend and infra only.',
+      bio: '', email: null, phone: null, link: 'linkedin.com/in/marcuswebb' },
+    { id: 'dana', name: 'Dana Kim', handle: 'danak', initials: 'DK',
+      skills: ['Data / ML', 'Mentorship / teaching'],
+      project: { name: 'SignalBoard', stage: 'Launched', desc: 'Dashboard for tracking local air quality sensors', link: 'signalboard.io' },
+      helpOffered: ['Mentoring', 'Giving talks'],
+      needs: ['Investor intros', 'Funding'],
+      needsDetail: 'Looking for anyone with grant-writing experience.',
+      bio: 'Happy to give a talk on time series forecasting.',
+      email: 'dana.kim@example.com', phone: null, link: null },
+    { id: 'theo', name: 'Theo Alvarez', handle: 'theo_a', initials: 'TA',
+      skills: ['Mobile dev', 'Product'],
+      project: { name: 'Commuter', stage: 'Idea', desc: 'Ride-share matching for late night shifts', link: null },
+      helpOffered: ['Co-founding'],
+      needs: ['Technical co-founder', 'Beta users / testers'],
+      needsDetail: '', bio: 'New to the city, looking to meet people.',
+      email: null, phone: '555-0110', link: 'github.com/theoalvarez' },
+    { id: 'renee', name: 'Renee Ostrowski', handle: 'reneeo', initials: 'RO',
+      skills: ['Marketing / growth', 'Sales / business development'],
+      project: null,
+      helpOffered: ['Intros & connections', 'Hosting events'],
+      needs: ['Beta users / testers'],
+      needsDetail: 'Can help with launch messaging or pitch decks.', bio: '',
+      email: 'renee.o@example.com', phone: null, link: 'renee.dev' },
+    { id: 'samir', name: 'Samir Bhatt', handle: 'sbhatt', initials: 'SB',
+      skills: ['Legal', 'Operations'],
+      project: null,
+      helpOffered: ['Mentoring'],
+      needs: ['Legal / accounting help'],
+      needsDetail: 'Happy to look over incorporation docs for early founders.', bio: '',
+      email: 'samir.bhatt@example.com', phone: '555-0177', link: 'github.com/samirbhatt' },
+  ];
+
+  const esc = (s) => (s || '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const stageClass = (stage) => ({ Idea: 'idea', Building: 'building', Launched: 'launched', Fundraising: 'fundraising' }[stage] || 'idea');
+
+  function tagsHtml(list, max) {
+    if (!list || !list.length) return '';
+    const shown = max ? list.slice(0, max) : list;
+    const rest = max ? list.length - shown.length : 0;
+    return shown.map((t) => `<span class="tag">${esc(t)}</span>`).join('')
+      + (rest > 0 ? `<span class="tag more">+${rest}</span>` : '');
+  }
+
+  function stageHtml(project) {
+    if (!project) return '';
+    return `<span class="stage"><span class="stage-dot ${stageClass(project.stage)}"></span>${esc(project.stage)}</span>`;
+  }
+
+  function contactIconsHtml(m, size) {
+    const cls = 'icon-btn' + (size === 'sm' ? '' : '');
+    const mail = m.email
+      ? `<a class="${cls}" href="mailto:${esc(m.email)}" title="Email ${esc(m.name)}" onclick="event.stopPropagation()">${ICONS.mail}</a>`
+      : `<span class="${cls} disabled" title="Email not shared">${ICONS.mail}</span>`;
+    const phone = m.phone
+      ? `<a class="${cls}" href="tel:${esc(m.phone)}" title="Call ${esc(m.name)}" onclick="event.stopPropagation()">${ICONS.phone}</a>`
+      : `<span class="${cls} disabled" title="Phone not shared">${ICONS.phone}</span>`;
+    const chat = `<span class="${cls} disabled" title="Discord: ${esc(m.handle)}">${ICONS.chat}</span>`;
+    return mail + phone + chat;
+  }
+
+  // ---------------- Variant A: compact scan row ----------------
+  function rowAHtml(m) {
+    return `
+      <div class="rowA" tabindex="0" role="button" data-open-member="${m.id}" aria-label="View profile for ${esc(m.name)}">
+        <div class="avatar">${m.initials}</div>
+        <div class="name-block">
+          <div class="name">${esc(m.name)}</div>
+          <div class="handle mono">@${esc(m.handle)}</div>
+        </div>
+        <div class="tags">${tagsHtml(m.skills, 2)}</div>
+        <div class="stage">${stageHtml(m.project)}</div>
+        <div class="rail">${contactIconsHtml(m, 'sm')}</div>
+        <span class="chev">${ICONS.chevron}</span>
+      </div>`;
+  }
+
+  // ---------------- Variant B: two-line context row ----------------
+  function rowBHtml(m) {
+    const needLabel = m.needs && m.needs.length ? `<b>Looking for:</b> ${esc(m.needs.join(', '))}`
+      : (m.helpOffered && m.helpOffered.length ? `<b>Can help with:</b> ${esc(m.helpOffered.join(', '))}` : '');
+    return `
+      <div class="rowB" tabindex="0" role="button" data-open-member="${m.id}" aria-label="View profile for ${esc(m.name)}">
+        <div class="line1">
+          <div class="avatar">${m.initials}</div>
+          <div class="id-block">
+            <span class="name">${esc(m.name)}</span>
+            <span class="handle mono">@${esc(m.handle)}</span>
+            ${m.project ? `<span>· ${esc(m.project.name)}</span>` : ''}
+          </div>
+          ${stageHtml(m.project)}
+        </div>
+        <div class="line2">
+          <div class="tags">${tagsHtml(m.skills, 3)}</div>
+          <div class="need-preview">${needLabel}</div>
+        </div>
+      </div>`;
+  }
+
+  // ---------------- Variant C: split row, action rail ----------------
+  function rowCHtml(m) {
+    return `
+      <div class="rowC">
+        <div class="main" tabindex="0" role="button" data-open-member="${m.id}" aria-label="View profile for ${esc(m.name)}">
+          <div class="avatar">${m.initials}</div>
+          <div class="id-block">
+            <div class="name">${esc(m.name)}</div>
+            <div class="handle mono">@${esc(m.handle)}</div>
+          </div>
+          <div class="mid">
+            <div class="tags">${tagsHtml(m.skills, 3)}</div>
+            ${m.project ? `<div class="proj">${stageHtml(m.project)}<b>${esc(m.project.name)}</b></div>` : `<div class="proj">No active project</div>`}
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="rail">${contactIconsHtml(m)}</div>
+        <button class="icon-btn chev-btn" data-open-member="${m.id}" aria-label="Open full profile for ${esc(m.name)}">${ICONS.chevron}</button>
+      </div>`;
+  }
+
+  document.getElementById('rowsA').innerHTML = MEMBERS.map(rowAHtml).join('');
+  document.getElementById('rowsB').innerHTML = MEMBERS.map(rowBHtml).join('');
+  document.getElementById('rowsC').innerHTML = MEMBERS.map(rowCHtml).join('');
+
+  // ---------------- shared detail-content builder ----------------
+  function detailInner(m) {
+    const contact = `
+      <div class="contact-list">
+        <div class="contact-row ${m.email ? '' : 'disabled'}">
+          <span class="icon-btn">${ICONS.mail}</span>
+          ${m.email ? `<a class="contact-value" href="mailto:${esc(m.email)}">${esc(m.email)}</a>` : '<span class="contact-value">Not shared publicly</span>'}
+        </div>
+        <div class="contact-row ${m.phone ? '' : 'disabled'}">
+          <span class="icon-btn">${ICONS.phone}</span>
+          ${m.phone ? `<a class="contact-value" href="tel:${esc(m.phone)}">${esc(m.phone)}</a>` : '<span class="contact-value">Not shared publicly</span>'}
+        </div>
+        <div class="contact-row">
+          <span class="icon-btn">${ICONS.chat}</span>
+          <span class="contact-value">@${esc(m.handle)} on Discord</span>
+        </div>
+        ${m.link ? `<div class="contact-row"><span class="icon-btn">${ICONS.link}</span><a class="contact-value" href="https://${esc(m.link)}" target="_blank" rel="noopener">${esc(m.link)}</a></div>` : ''}
+      </div>`;
+
+    const skillsBlock = `<div class="detail-block"><p class="detail-label">Skills</p><div class="tags">${tagsHtml(m.skills)}</div></div>`;
+
+    const project = m.project ? `
+      <div class="detail-block">
+        <p class="detail-label">Project</p>
+        <div class="project-card">
+          <div class="proj-head"><span class="proj-name">${esc(m.project.name)}</span>${stageHtml(m.project)}</div>
+          <p class="proj-desc">${esc(m.project.desc)}</p>
+          ${m.project.link ? `<a class="proj-link mono" href="https://${esc(m.project.link)}" target="_blank" rel="noopener">${esc(m.project.link)}</a>` : ''}
+        </div>
+      </div>` : '';
+
+    const helpNeeds = `
+      <div class="detail-block">
+        <p class="detail-label">Can help with</p>
+        <div class="tags">${(m.helpOffered || []).map((t) => `<span class="tag offer">${esc(t)}</span>`).join('') || '<span class="notes-text">Nothing listed</span>'}</div>
+      </div>
+      <div class="detail-block">
+        <p class="detail-label">Looking for</p>
+        <div class="tags">${(m.needs || []).map((t) => `<span class="tag need">${esc(t)}</span>`).join('') || '<span class="notes-text">Nothing listed</span>'}</div>
+        ${m.needsDetail ? `<p class="needs-detail">${esc(m.needsDetail)}</p>` : ''}
+      </div>`;
+
+    const notes = m.bio ? `<div class="detail-block"><p class="detail-label">Notes</p><p class="notes-text">${esc(m.bio)}</p></div>` : '';
+
+    return { contact, skillsBlock, project, helpNeeds, notes };
+  }
+
+  function detailHeaderHtml(m, closeAttrs) {
+    return `
+      <div class="detail-header">
+        <div class="avatar lg">${m.initials}</div>
+        <div class="id-block">
+          <div class="name">${esc(m.name)}</div>
+          <div class="handle mono">@${esc(m.handle)}</div>
+        </div>
+        <div class="quick-actions">${contactIconsHtml(m)}</div>
+        <button class="icon-btn close-btn" ${closeAttrs} aria-label="Close">${ICONS.close}</button>
+      </div>`;
+  }
+
+  // Layout 1: modal, two columns
+  function modalLayout(m, closeAttrs) {
+    const d = detailInner(m);
+    return detailHeaderHtml(m, closeAttrs) + `
+      <div class="detail-body-2col">
+        <div>${d.skillsBlock}<div class="detail-block"><p class="detail-label">Contact</p>${d.contact}</div></div>
+        <div>${d.project}${d.helpNeeds}${d.notes}</div>
+      </div>`;
+  }
+
+  // Layout 2: drawer, single sectioned column
+  function drawerLayout(m, closeAttrs) {
+    const d = detailInner(m);
+    return detailHeaderHtml(m, closeAttrs) + `
+      <div class="detail-body-1col">
+        ${d.skillsBlock}
+        <div class="detail-block"><p class="detail-label">Contact</p>${d.contact}</div>
+        ${d.project}${d.helpNeeds}${d.notes}
+      </div>`;
+  }
+
+  // Layout 3: inline expand, condensed grid
+  function expandLayout(m) {
+    const d = detailInner(m);
+    return `
+      <div class="expand-body">
+        ${d.skillsBlock}
+        <div class="expand-grid">
+          <div><div class="detail-block" style="margin-top:0"><p class="detail-label">Contact</p>${d.contact}</div></div>
+          <div>${d.project}</div>
+        </div>
+        <div class="expand-grid">${d.helpNeeds}</div>
+        ${d.notes}
+      </div>`;
+  }
+
+  // ---------------- global modal wiring (Part 1 rows) ----------------
+  const globalModal = document.getElementById('global-modal');
+  const globalModalPanel = document.getElementById('global-modal-panel');
+
+  function openGlobalModal(id) {
+    const m = MEMBERS.find((x) => x.id === id);
+    if (!m) return;
+    globalModalPanel.innerHTML = modalLayout(m, 'data-close-global');
+    globalModal.classList.add('open');
+  }
+  function closeGlobalModal() { globalModal.classList.remove('open'); }
+
+  document.addEventListener('click', (e) => {
+    const opener = e.target.closest('[data-open-member]');
+    if (opener) { openGlobalModal(opener.getAttribute('data-open-member')); return; }
+    if (e.target.closest('[data-close-global]')) { closeGlobalModal(); return; }
+    if (e.target === globalModal) { closeGlobalModal(); }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeGlobalModal();
+    if ((e.key === 'Enter' || e.key === ' ') && document.activeElement && document.activeElement.hasAttribute('data-open-member')) {
+      e.preventDefault();
+      openGlobalModal(document.activeElement.getAttribute('data-open-member'));
+    }
+  });
+
+  // ---------------- Part 2 demo frames (Priya, pre-populated) ----------------
+  const priya = MEMBERS[0];
+
+  document.getElementById('demo-modal-panel').innerHTML = modalLayout(priya, 'data-close-frame="demo-modal"');
+  document.getElementById('demo-drawer-panel').innerHTML = drawerLayout(priya, 'data-close-frame="demo-drawer"');
+
+  document.querySelectorAll('[data-reopen]').forEach((btn) => {
+    btn.addEventListener('click', () => document.getElementById(btn.getAttribute('data-reopen')).classList.add('showing'));
+  });
+  document.addEventListener('click', (e) => {
+    const closer = e.target.closest('[data-close-frame]');
+    if (closer) document.getElementById(closer.getAttribute('data-close-frame')).classList.remove('showing');
+  });
+
+  // ---------------- Part 2, variant 3: inline expand ----------------
+  const expandWrap = document.getElementById('expand-demo');
+  expandWrap.innerHTML = `
+    <div class="expand-header" role="button" tabindex="0" aria-expanded="true">
+      <div class="avatar">${priya.initials}</div>
+      <div class="id-block" style="flex:1">
+        <span class="name">${esc(priya.name)}</span>
+        <span class="handle mono">@${esc(priya.handle)}</span>
+        ${priya.project ? `<span> · ${esc(priya.project.name)}</span>` : ''}
+      </div>
+      ${stageHtml(priya.project)}
+      <span class="chev" style="display:flex">${ICONS.chevron}</span>
+    </div>
+    <div class="expand-panel">${expandLayout(priya)}</div>`;
+
+  expandWrap.querySelector('.expand-header').addEventListener('click', () => {
+    const open = expandWrap.classList.toggle('open');
+    expandWrap.querySelector('.expand-header').setAttribute('aria-expanded', String(open));
+  });
+</script>

@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+/* Colors pulled from hubcityhackers.com's live site (header/ink, page bg, and accent mint/green). */
+@theme {
+  --color-hch-ink: #010023;
+  --color-hch-cream: #fbfbf8;
+  --color-hch-mint: #11ffb1;
+  --color-hch-mint-dark: #006d4b;
+  --color-hch-muted-1: #5b5a70;
+  --color-hch-muted-2: #85849a;
+  --color-hch-muted-3: #a6a5b8;
+  --color-hch-border: #cbcbd5;
+}
