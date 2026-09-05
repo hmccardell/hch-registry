@@ -24,7 +24,7 @@ export const config = {
   // Single shared access gate for the registry, checked server-side so the
   // password never ships in the frontend bundle.
   authUser: process.env.AUTH_USER || 'hch',
-  authPassword: requireInProd('AUTH_PASSWORD', 'REDACTED'),
+  authPassword: requireInProd('AUTH_PASSWORD', 'dev-password-change-me'),
   // Signs session tokens. Changing it logs everyone out.
   authSecret: requireInProd('AUTH_SECRET', 'dev-insecure-secret-change-me'),
 
