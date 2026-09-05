@@ -41,7 +41,7 @@ export default function DirectoryControls({
         <div className="flex-1">
           <SearchBar value={query} onChange={onQueryChange} />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <FilterMenu
             label="Skills"
             options={skillOptions}
@@ -53,6 +53,7 @@ export default function DirectoryControls({
             options={helpOptions}
             selected={helpFilters}
             onChange={onHelpFiltersChange}
+            align="right"
           />
           <button
             type="button"

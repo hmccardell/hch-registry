@@ -50,7 +50,7 @@ export default function NeedsPage({ members, status }) {
       </a>
 
       <div className="sticky top-0 z-20 -mx-4 mt-4 bg-hch-cream px-4 pb-3 pt-3">
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-hch-border bg-white p-3 shadow-sm">
+        <div className="flex flex-col items-start gap-3 rounded-lg border border-hch-border bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <h2 className="text-lg font-bold text-hch-ink">
             Assisting your fellow Hackers? A noble pursuit.
           </h2>

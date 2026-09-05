@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 function ChevronDownIcon(props) {
   return (
@@ -34,6 +34,9 @@ function CheckIcon(props) {
 
 export default function FilterMenu({ label, options, selected, onChange, align = 'left' }) {
   const [open, setOpen] = useState(false);
+  // On phones the dropdown can't reliably drop from the trigger without running
+  // off one edge, so there it's pinned to the viewport with only `top` tracked.
+  const [mobileTop, setMobileTop] = useState(null);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -49,6 +52,22 @@ export default function FilterMenu({ label, options, selected, onChange, align =
     return () => {
       document.removeEventListener('mousedown', onDoc);
       document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const isMobile = () => window.matchMedia('(max-width: 639px)').matches;
+    const place = () => {
+      if (!ref.current) return;
+      setMobileTop(isMobile() ? ref.current.getBoundingClientRect().bottom + 4 : null);
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
     };
   }, [open]);
 
@@ -79,8 +98,11 @@ export default function FilterMenu({ label, options, selected, onChange, align =
 
       {open && (
         <div
-          className={`absolute z-30 mt-1 max-h-72 w-64 overflow-y-auto rounded-md border border-hch-border bg-white p-1 shadow-lg ${
-            align === 'right' ? 'right-0' : 'left-0'
+          style={mobileTop != null ? { position: 'fixed', top: mobileTop, left: 12, right: 12 } : undefined}
+          className={`z-30 max-h-72 overflow-y-auto rounded-md border border-hch-border bg-white p-1 shadow-lg ${
+            mobileTop != null
+              ? ''
+              : `absolute mt-1 w-64 max-w-[calc(100vw-2rem)] ${align === 'right' ? 'right-0' : 'left-0'}`
           }`}
         >
           {options.length === 0 && (

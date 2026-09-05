@@ -28,12 +28,12 @@ export default function MemberDetail({ member }) {
   const needs = [...(member.needs || [])].sort(byAlpha);
 
   return (
-    <div className="space-y-5 border-t border-hch-border bg-hch-cream px-5 py-5">
+    <div className="space-y-5 border-t border-hch-border bg-hch-cream px-4 py-5 sm:px-5">
       <div>
         <DetailLabel>Skills</DetailLabel>
         {skills.length ? (
           <ul
-            className="grid grid-flow-col justify-start gap-x-8 text-sm text-hch-muted-1 marker:text-hch-mint-dark"
+            className="flex flex-col gap-y-1 text-sm text-hch-muted-1 marker:text-hch-mint-dark sm:grid sm:grid-flow-col sm:justify-start sm:gap-x-8"
             style={{
               gridTemplateRows: `repeat(${Math.min(skills.length, SKILLS_PER_COLUMN)}, auto)`,
               gridAutoColumns: 'max-content',
