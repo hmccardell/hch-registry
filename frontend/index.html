@@ -3,9 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- The app is light-only. Tell the browser so it won't apply a dark
+         canvas or force-dark the page on phones set to dark mode. -->
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#fbfbf8" />
     <title>Hub City Hackers — Member Directory</title>
   </head>
-  <body>
+  <body style="background-color: #fbfbf8">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

@@ -1,6 +1,17 @@
 @import "tailwindcss";
 
 /* Colors pulled from hubcityhackers.com's live site (header/ink, page bg, and accent mint/green). */
+/* Light-only app. Paint the page surface (html/body) cream so a phone in dark
+   mode never shows a dark backdrop behind the layout, in overscroll gaps, or
+   before React mounts. */
+:root {
+  color-scheme: light;
+}
+html,
+body {
+  background-color: var(--color-hch-cream, #fbfbf8);
+}
+
 @theme {
   --color-hch-ink: #010023;
   --color-hch-cream: #fbfbf8;
