@@ -1,0 +1,45 @@
+# Render Blueprint — deploys the registry as one Node web service.
+#
+# The build compiles the React frontend; the service then serves that bundle
+# from the same Express process that exposes the API, all under one base path
+# (/registry), so there is a single origin and no CORS to configure.
+#
+# This project lives in a subdirectory of the HCH website repo, so `rootDir`
+# points Render at it and the build/start commands run from there. Either keep
+# this as its own service and reverse-proxy `/registry/*` to it from the main
+# site (WITHOUT stripping the prefix — the app owns the whole /registry path),
+# or fold these keys into the site's own render.yaml as a second service.
+#
+# On the first deploy, Render prompts for every var below marked `sync: false`.
+# Get GOOGLE_* from the service-account JSON (see the README), and pick a
+# REGISTRY_AUTH_PASSWORD. REGISTRY_AUTH_SECRET is generated for you.
+services:
+  - type: web
+    name: hch-registry
+    runtime: node
+    plan: free
+    rootDir: registry
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /registry/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Override only if the reverse proxy serves the registry at a different
+      # path. Must match `base` in frontend/vite.config.js at build time.
+      - key: BASE_PATH
+        value: /registry
+      - key: REGISTRY_AUTH_USER
+        value: hch
+      - key: REGISTRY_AUTH_PASSWORD
+        sync: false
+      - key: REGISTRY_AUTH_SECRET
+        generateValue: true
+      - key: GOOGLE_SHEET_ID
+        sync: false
+      - key: GOOGLE_SHEET_RANGE
+        value: Form Responses 1
+      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
+        sync: false

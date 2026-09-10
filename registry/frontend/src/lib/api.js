@@ -1,7 +1,9 @@
-// Calls are relative: same-origin in production (the server serves this bundle)
-// and through Vite's dev proxy locally. Set VITE_API_URL only to target a
-// server on a different origin.
-const API_URL = import.meta.env.VITE_API_URL || '';
+// Calls are relative and prefixed with the registry's base path: same-origin
+// in production (the server serves this bundle and mounts its routes under the
+// same prefix) and through Vite's dev proxy locally. Must match `base` in
+// vite.config.js and BASE_PATH in the server. Set VITE_API_URL only to target
+// a server on a different origin.
+const API_URL = import.meta.env.VITE_API_URL || '/registry';
 
 export async function login(username, password) {
   const res = await fetch(`${API_URL}/api/auth/login`, {
