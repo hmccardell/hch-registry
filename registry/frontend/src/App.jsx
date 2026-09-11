@@ -1,19 +1,27 @@
 import { useEffect, useState } from 'react';
 import { fetchDirectory } from './lib/api.js';
-import { getToken, setToken, clearToken } from './lib/auth.js';
+import { getToken, setToken, clearToken, takeAuthResultFromUrl } from './lib/auth.js';
 import LoginPage from './pages/LoginPage.jsx';
 import DirectoryPage from './pages/DirectoryPage.jsx';
 import NeedsPage from './pages/NeedsPage.jsx';
+
+// Read the sign-in redirect (`#token=` / `#error=link`) exactly once, before the
+// component mounts, since it also scrubs the URL fragment as a side effect.
+const authResult = takeAuthResultFromUrl();
+if (authResult.token) setToken(authResult.token);
+
+const LINK_ERROR = 'That sign-in link was invalid or expired — request a new one.';
 
 function currentRoute() {
   return window.location.hash === '#/needs' ? 'needs' : 'directory';
 }
 
 export default function App() {
-  const [token, setTokenState] = useState(getToken());
+  const [token, setTokenState] = useState(authResult.token || getToken());
   const [members, setMembers] = useState([]);
   const [status, setStatus] = useState('loading');
   const [route, setRoute] = useState(currentRoute());
+  const [loginNotice] = useState(authResult.error === 'link' ? LINK_ERROR : '');
 
   useEffect(() => {
     if (!token) return;
@@ -39,14 +47,6 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
-  const handleAuthed = (t) => {
-    // Always land on the member list, regardless of which route the hash points at.
-    history.replaceState(null, '', window.location.pathname + window.location.search);
-    setRoute('directory');
-    setToken(t);
-    setTokenState(t);
-  };
-
   const signOut = () => {
     clearToken();
     setTokenState('');
@@ -55,7 +55,7 @@ export default function App() {
   };
 
   if (!token) {
-    return <LoginPage onAuthed={handleAuthed} />;
+    return <LoginPage notice={loginNotice} />;
   }
 
   return (

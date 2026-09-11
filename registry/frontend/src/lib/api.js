@@ -5,24 +5,27 @@
 // a server on a different origin.
 const API_URL = import.meta.env.VITE_API_URL || '/registry';
 
-export async function login(username, password) {
-  const res = await fetch(`${API_URL}/api/auth/login`, {
+// Ask the server to email a one-time sign-in link. Resolves once the request is
+// accepted — the response is deliberately the same whether or not the address is
+// on the roster, so a `true` here does not mean an email was actually sent.
+export async function requestLoginLink(email) {
+  const res = await fetch(`${API_URL}/api/auth/request-link`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ email }),
   });
-  if (res.status === 401) {
-    throw new Error('Invalid username or password');
-  }
   if (res.status === 429) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || 'Too many attempts. Please wait a few minutes.');
   }
-  if (!res.ok) {
-    throw new Error(`Login failed (${res.status})`);
+  if (res.status === 400 || res.status === 503) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || 'Could not send the sign-in link.');
   }
-  const { token } = await res.json();
-  return token;
+  if (!res.ok) {
+    throw new Error(`Request failed (${res.status})`);
+  }
+  return true;
 }
 
 export async function fetchDirectory(token) {

@@ -1,8 +1,6 @@
 import crypto from 'node:crypto';
 import { config } from './config.js';
 
-const TOKEN_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
-
 function safeEqual(a, b) {
   const ab = Buffer.from(String(a));
   const bb = Buffer.from(String(b));
@@ -10,36 +8,67 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(ab, bb);
 }
 
-export function verifyCredentials(username, password) {
-  return safeEqual(username, config.authUser) && safeEqual(password, config.authPassword);
+// Stateless signed token: base64url(JSON payload).base64url(HMAC-SHA256).
+// The HMAC covers a `label` as well as the payload, so a token minted for one
+// purpose ("magic") can never be replayed as another ("session"), even though
+// both are signed with the same secret.
+function sign(label, payload) {
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig = crypto
+    .createHmac('sha256', config.authSecret)
+    .update(`${label}.${body}`)
+    .digest('base64url');
+  return `${body}.${sig}`;
 }
 
-// Stateless session token: base64url(payload).base64url(HMAC-SHA256(payload)).
-// No server-side session store — verification only needs the shared secret.
-export function issueToken(ttlMs = TOKEN_TTL_MS) {
-  const payload = Buffer.from(JSON.stringify({ exp: Date.now() + ttlMs })).toString('base64url');
-  const sig = crypto.createHmac('sha256', config.authSecret).update(payload).digest('base64url');
-  return `${payload}.${sig}`;
-}
-
-export function verifyToken(token) {
-  if (typeof token !== 'string' || !token.includes('.')) return false;
-  const [payload, sig] = token.split('.');
-  const expected = crypto.createHmac('sha256', config.authSecret).update(payload).digest('base64url');
-  if (!safeEqual(sig, expected)) return false;
+function unsign(label, token) {
+  if (typeof token !== 'string' || !token.includes('.')) return null;
+  const [body, sig] = token.split('.');
+  const expected = crypto
+    .createHmac('sha256', config.authSecret)
+    .update(`${label}.${body}`)
+    .digest('base64url');
+  if (!safeEqual(sig, expected)) return null;
   try {
-    const { exp } = JSON.parse(Buffer.from(payload, 'base64url').toString());
-    return typeof exp === 'number' && Date.now() < exp;
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
+    if (typeof payload.exp !== 'number' || Date.now() >= payload.exp) return null;
+    return payload;
   } catch {
-    return false;
+    return null;
   }
+}
+
+// --- Magic link: emailed, short-lived, single-use (replay guard lives in
+// index.js keyed on `jti`). Proves control of the email address. ---
+export function issueMagicToken(email) {
+  return sign('magic', {
+    sub: email,
+    jti: crypto.randomBytes(9).toString('base64url'),
+    exp: Date.now() + config.magicLinkTtlMs,
+  });
+}
+
+export function verifyMagicToken(token) {
+  return unsign('magic', token); // -> { sub, jti, exp } | null
+}
+
+// --- Session: returned after a link is redeemed, sent as `Authorization:
+// Bearer` on every subsequent request. No server-side store. ---
+export function issueSession(email) {
+  return sign('session', { sub: email, exp: Date.now() + config.sessionTtlMs });
+}
+
+export function verifySession(token) {
+  return unsign('session', token); // -> { sub, exp } | null
 }
 
 export function requireAuth(req, res, next) {
   const header = req.get('authorization') || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-  if (!verifyToken(token)) {
+  const session = verifySession(token);
+  if (!session) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
+  req.user = { email: session.sub };
   next();
 }

@@ -2,7 +2,8 @@
 
 A private Supabase table holds member records (real emails and phone numbers); a
 small Express server filters that table down to what each member agreed to show
-publicly; a React app renders the result behind a shared password.
+publicly; a React app renders the result. Members sign in with a one-time link
+emailed to the address already on their record — no passwords.
 
 ```
 frontend/   Vite + React + Tailwind — the directory UI
@@ -91,11 +92,16 @@ npm run dev               # http://localhost:5173/registry/
 | --- | --- |
 | `PORT` | `4000` unless taken. |
 | `BASE_PATH` | Subpath everything mounts under. Default `/registry`; leave unset locally unless you also change `base` in `frontend/vite.config.js`. |
-| `REGISTRY_AUTH_USER` / `REGISTRY_AUTH_PASSWORD` | The shared login. Any values locally. |
+| `PUBLIC_URL` | Leave unset locally — the sign-in link is built from the request origin. |
 | `REGISTRY_AUTH_SECRET` | Any string locally. Generate a real one for prod: `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
+| `SMTP_URL` | Leave unset locally — sign-in links print to the server terminal instead of being emailed. |
+| `MAIL_FROM` | Only matters once `SMTP_URL` is set. |
 | `SUPABASE_URL` | Project Settings → Data API → Project URL. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Project Settings → API Keys → `service_role` secret. Server-only. |
 | `SUPABASE_MEMBERS_TABLE` | Only if the table isn't named `members`. |
+
+To sign in locally: enter an email that exists in the `members` table, then open
+the link the **server terminal** prints (`[mailer] dev mode — sign-in link…`).
 
 Check <http://localhost:4000/registry/health> → `{"ok":true}`. A `500` from
 `/registry/api/directory` means a `SUPABASE_*` value is off or the table name
@@ -112,9 +118,11 @@ run from here.
 2. In Render: **New → Blueprint**, point it at the repo. It reads
    [`render.yaml`](render.yaml) and creates the `hch-registry` service
    (build `npm run build`, start `npm start`, from `registry/`).
-3. When prompted, set the secrets: `REGISTRY_AUTH_PASSWORD`, `SUPABASE_URL`,
-   `SUPABASE_SERVICE_ROLE_KEY`. `REGISTRY_AUTH_SECRET` is generated; `NODE_ENV`,
-   `BASE_PATH`, and `REGISTRY_AUTH_USER` have defaults in the blueprint.
+3. When prompted, set the secrets: `PUBLIC_URL` (where members reach the
+   registry, e.g. `https://hubcityhackers.com/registry`), `SMTP_URL` (a
+   transactional-email provider), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
+   `REGISTRY_AUTH_SECRET` is generated; `NODE_ENV`, `BASE_PATH`, and `MAIL_FROM`
+   have defaults in the blueprint.
 4. Deploy. The service answers under `https://<service>.onrender.com/registry`.
    Put it behind the main site's reverse proxy so `hubcityhackers.com/registry/*`
    forwards here **without stripping the prefix** — the app owns the whole
@@ -123,8 +131,9 @@ run from here.
 Notes:
 
 - With `NODE_ENV=production` the server **refuses to start** unless
-  `REGISTRY_AUTH_PASSWORD` and `REGISTRY_AUTH_SECRET` are set, so it can never
-  ship on the built-in dev defaults.
+  `REGISTRY_AUTH_SECRET` is set, and **refuses to send** (returns 503 on
+  sign-in) unless `SMTP_URL` is set — it can never ship on the dev defaults or
+  silently print links to the logs.
 - Render's free plan sleeps the service after ~15 min idle; the next request
   wakes it (a slow first load).
 - The directory response is cached in memory for 60s, so an edit or deletion in
@@ -153,12 +162,12 @@ Checklist once it's in:
 - **Deploy.** Either keep this as its own Render service using the `render.yaml`
   here (`rootDir: registry`), or copy the service block into the site's own
   blueprint. The build/start commands already scope themselves to this folder.
-- **Env vars** are `REGISTRY_`-prefixed (`REGISTRY_AUTH_USER/PASSWORD/SECRET`)
-  so they don't collide with the host site's own `AUTH_*`. `SUPABASE_*`, `PORT`,
-  and `NODE_ENV` are unchanged — if the site already sets `NODE_ENV`/`PORT` in a
-  shared environment group, that's fine; they mean the same thing here. If the
-  host site also uses Supabase, keep these `SUPABASE_*` values scoped to this
-  service unless both point at the same project.
+- **Env vars**: `REGISTRY_AUTH_SECRET` is `REGISTRY_`-prefixed so it doesn't
+  collide with the host site's own `AUTH_*`. `SUPABASE_*`, `SMTP_URL`,
+  `MAIL_FROM`, `PUBLIC_URL`, `PORT`, and `NODE_ENV` are unchanged — if the site
+  already sets `NODE_ENV`/`PORT` in a shared environment group, that's fine.
+  Keep `SUPABASE_*` scoped to this service unless the host site points at the
+  same project; likewise `SMTP_URL` if the site sends its own mail.
 - **Node version.** `.node-version` pins 22 and every `package.json` says
   `engines.node >=22`. Match the site's toolchain or bump both together.
 - **Workspaces.** `server/` and `frontend/` are independent packages with their
@@ -169,6 +178,32 @@ Checklist once it's in:
 - **Secrets.** `server/.env` is git-ignored and has never been committed; the
   subtree import carries no secrets. Recreate `.env` from `.env.example` in the
   new checkout for local dev.
+
+## How sign-in works
+
+No passwords. The only credential is control of an email address that already
+appears in the `members` table.
+
+1. **Request** — `POST /api/auth/request-link { email }`
+   ([`index.js`](server/src/index.js)). The server checks the address against the
+   `email` column ([`memberExistsByEmail`](server/src/supabase.js), case-
+   insensitive) and, if it matches, emails a link
+   ([`mailer.js`](server/src/mailer.js)) containing a signed, 15-minute token
+   ([`issueMagicToken`](server/src/auth.js)). The response is an identical `200`
+   either way — it's not an oracle for who's a member. Rate-limited to 5 per 15
+   minutes per IP.
+2. **Redeem** — the link hits `GET /api/auth/callback?token=…`, which verifies
+   the token, records its `jti` so it can't be used twice, mints a 12-hour
+   session token, and redirects to the app with it in the URL *fragment*
+   (`#token=…`). The fragment is never sent to a server; the app reads it once
+   and strips it ([`takeAuthResultFromUrl`](frontend/src/lib/auth.js)).
+3. **Use** — the app stores the session token and sends it as
+   `Authorization: Bearer` on every `/api/directory` call
+   ([`requireAuth`](server/src/auth.js)).
+
+Magic-link and session tokens are both HMAC-signed with `REGISTRY_AUTH_SECRET`
+but domain-separated by a label, so one can't be replayed as the other. The
+single-use `jti` set is in-memory — fine for one instance, not for several.
 
 ## How the privacy filtering works
 
@@ -190,6 +225,20 @@ with the table.
   to anything. Rows go in through the Supabase dashboard (or whatever you build
   to write to the table). A public submission form and an "edit my entry" flow
   are not part of this.
+- **Registration / approval.** Adding someone is a manual table insert. There's
+  no "apply → an admin approves → you can now sign in" flow, no admin UI, and no
+  way for a member to change the email they sign in with.
+- **Sign-in hardening.** The single-use link guard (`jti`) is in-memory, so it
+  resets on redeploy and doesn't hold across multiple instances — a shared store
+  (Redis, or a Supabase table) is needed for that. The session token also rides
+  in the redirect URL fragment; swapping that for a one-time exchange code would
+  keep it out of the URL entirely. No "sign out everywhere" / revocation short
+  of rotating `REGISTRY_AUTH_SECRET`.
+- **Email delivery.** `SMTP_URL` is raw SMTP with no retry/bounce handling,
+  DKIM/SPF setup, or templated HTML — just a plain-text link.
+- **Case/format-exact email match.** `memberExistsByEmail` lowercases and does a
+  literal `ILIKE`; a `citext` column or stored-normalized address would be
+  sturdier than matching on a free-text `text` column.
 - Tiered visibility (e.g. an authenticated members-only view) — every row is
   public.
 - A way to contact someone who hid their email and phone.

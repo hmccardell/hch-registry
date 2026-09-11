@@ -27,14 +27,27 @@ export const config = {
   // and the reverse-proxy path in front of the deployed service. No trailing slash.
   basePath: (process.env.BASE_PATH || '/registry').replace(/\/$/, ''),
 
-  // Single shared access gate for the registry, checked server-side so the
-  // password never ships in the frontend bundle. Vars are REGISTRY_-prefixed
-  // so they don't clash with the host site's own AUTH_* when this service
-  // shares an environment group with it.
-  authUser: process.env.REGISTRY_AUTH_USER || 'hch',
-  authPassword: requireInProd('REGISTRY_AUTH_PASSWORD', 'dev-password-change-me'),
-  // Signs session tokens. Changing it logs everyone out.
+  // Absolute, browser-facing origin + base path of the deployed registry
+  // (e.g. https://hubcityhackers.com/registry). Used to build the sign-in link
+  // that goes in the email. Behind a reverse proxy the inbound Host header is
+  // unreliable, so set this explicitly in production. Unset locally: the link is
+  // derived from the incoming request's own origin. No trailing slash.
+  publicUrl: (process.env.PUBLIC_URL || '').replace(/\/$/, ''),
+
+  // Signs both the emailed magic-link tokens and the Bearer session tokens.
+  // Changing it invalidates every outstanding link and logs everyone out.
   authSecret: requireInProd('REGISTRY_AUTH_SECRET', 'dev-insecure-secret-change-me'),
+
+  // How long an emailed sign-in link stays valid, and (once redeemed) how long
+  // the resulting session lasts.
+  magicLinkTtlMs: Number(process.env.MAGIC_LINK_TTL_MS) || 15 * 60 * 1000,
+  sessionTtlMs: Number(process.env.SESSION_TTL_MS) || 12 * 60 * 60 * 1000,
+
+  // Transactional email as an SMTP URL — any provider works (Resend, Postmark,
+  // SES, ...): smtps://user:pass@host:465. Unset locally: sign-in links are
+  // printed to the server console instead of sent.
+  smtpUrl: process.env.SMTP_URL || '',
+  mailFrom: process.env.MAIL_FROM || 'HCH Registry <no-reply@localhost>',
 
   // Supabase project that holds the members table. If unset, /api/directory
   // returns a clear 500 (see supabase.js) but the rest of the app runs.

@@ -10,9 +10,10 @@
 # site (WITHOUT stripping the prefix — the app owns the whole /registry path),
 # or fold these keys into the site's own render.yaml as a second service.
 #
-# On the first deploy, Render prompts for every var below marked `sync: false`.
-# Get SUPABASE_* from the Supabase dashboard (see the README), and pick a
-# REGISTRY_AUTH_PASSWORD. REGISTRY_AUTH_SECRET is generated for you.
+# On the first deploy, Render prompts for every var below marked `sync: false`:
+# SUPABASE_* from the Supabase dashboard (see the README), PUBLIC_URL (the
+# browser-facing URL of the registry), and SMTP_URL (a transactional-email
+# provider). REGISTRY_AUTH_SECRET is generated for you.
 services:
   - type: web
     name: hch-registry
@@ -29,12 +30,19 @@ services:
       # path. Must match `base` in frontend/vite.config.js at build time.
       - key: BASE_PATH
         value: /registry
-      - key: REGISTRY_AUTH_USER
-        value: hch
-      - key: REGISTRY_AUTH_PASSWORD
+      # Browser-facing URL of the registry — used to build the sign-in link in
+      # the email. Set to wherever members actually reach it.
+      - key: PUBLIC_URL
         sync: false
+      # Signs magic-link and session tokens.
       - key: REGISTRY_AUTH_SECRET
         generateValue: true
+      # Transactional email as one SMTP URL, e.g.
+      #   smtps://apikey:re_xxx@smtp.resend.com:465
+      - key: SMTP_URL
+        sync: false
+      - key: MAIL_FROM
+        value: HCH Registry <no-reply@hubcityhackers.com>
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
