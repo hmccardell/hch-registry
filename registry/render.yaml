@@ -11,7 +11,7 @@
 # or fold these keys into the site's own render.yaml as a second service.
 #
 # On the first deploy, Render prompts for every var below marked `sync: false`.
-# Get GOOGLE_* from the service-account JSON (see the README), and pick a
+# Get SUPABASE_* from the Supabase dashboard (see the README), and pick a
 # REGISTRY_AUTH_PASSWORD. REGISTRY_AUTH_SECRET is generated for you.
 services:
   - type: web
@@ -35,11 +35,7 @@ services:
         sync: false
       - key: REGISTRY_AUTH_SECRET
         generateValue: true
-      - key: GOOGLE_SHEET_ID
+      - key: SUPABASE_URL
         sync: false
-      - key: GOOGLE_SHEET_RANGE
-        value: Form Responses 1
-      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
-        sync: false
-      - key: GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
+      - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false

@@ -1,17 +1,17 @@
 # Hub City Hackers — Member Registry
 
-A Google Form feeds a private Google Sheet (real emails and phone numbers); a
-small Express server filters that sheet down to what each member agreed to show
+A private Supabase table holds member records (real emails and phone numbers); a
+small Express server filters that table down to what each member agreed to show
 publicly; a React app renders the result behind a shared password.
 
 ```
 frontend/   Vite + React + Tailwind — the directory UI
-server/     Express — reads the sheet, applies the privacy rules, serves JSON,
+server/     Express — reads the table, applies the privacy rules, serves JSON,
             and (in production) serves the built frontend
 ```
 
-The frontend never touches Google Sheets. It only ever sees what the server
-chooses to expose.
+The frontend never touches Supabase. It only ever sees what the server chooses
+to expose, and only the server holds the Supabase key.
 
 **This project is designed to live in a subdirectory of the HCH website repo**
 and be served at a subpath (`/registry`) of the main site rather than on its own
@@ -22,28 +22,49 @@ agree: `BASE_PATH` in `server/src/config.js` (runtime, overridable via env),
 reverse-proxy rule in front of the deployed service. See
 [Integrating into the HCH website repo](#integrating-into-the-hch-website-repo).
 
-## One-time Google setup
+## One-time Supabase setup
 
-The server reads the sheet as a **service account** — a robot Google identity
-that can see one specific sheet and nothing else.
+The server reads the table with the project's **service-role key** — a
+server-only secret that bypasses row-level security. The table stays private
+(RLS on, no public policies) so the anon/public key can never read it.
 
-1. **Form → Sheet.** Build the form in Google Forms. Under **Settings →
-   Responses**, turn on **Collect email addresses** (this gives each submitter a
-   self-service "edit your response" link — no custom login needed for edits).
-   In the form's **Responses** tab, click the Sheets icon to create the linked
-   spreadsheet. That sheet is the private source of truth.
-2. **Cloud project.** At [console.cloud.google.com](https://console.cloud.google.com/),
-   create a project (e.g. `hch-registry`) and select it.
-3. **Enable the API.** *APIs & Services → Library →* search **Google Sheets
-   API** *→ Enable*.
-4. **Service account + key.** *APIs & Services → Credentials → Create
-   Credentials → Service account*. Skip the optional role grant. Open the new
-   account → **Keys → Add Key → Create new key → JSON**. A `.json` file
-   downloads — treat it like a password. You need two fields from it:
-   `client_email` and `private_key`.
-5. **Share the sheet.** Open the response sheet → **Share** → paste the
-   `client_email` → role **Viewer** → untick "Notify" → Share. Without this the
-   server gets a 403, even with a valid key.
+1. **Create the table.** In the Supabase dashboard → **SQL Editor**, run:
+
+   ```sql
+   create table members (
+     id            uuid primary key default gen_random_uuid(),
+     created_at    timestamptz not null default now(),
+     name          text,
+     email         text,
+     phone         text,
+     show_email    boolean not null default false,
+     show_phone    boolean not null default false,
+     discord_handle text,
+     links         text,
+     skills        text[] not null default '{}',
+     project_name  text,
+     project_description text,
+     project_stage text,
+     project_link  text,
+     help_offered  text[] not null default '{}',
+     needs         text[] not null default '{}',
+     needs_detail  text,
+     bio           text
+   );
+
+   alter table members enable row level security;
+   -- No policies: the service-role key (server only) still has full access;
+   -- the anon/public key gets nothing.
+   ```
+
+2. **Grab the credentials.** *Project Settings → Data API* → copy the **Project
+   URL**. *Project Settings → API Keys* → copy the **`service_role`** secret.
+   Treat that key like a password — it can read and write every table.
+
+3. **Load the data.** Import existing members via the dashboard's **Table
+   Editor → Insert → Import data from CSV**, or paste `insert` statements in the
+   SQL Editor. `show_email` / `show_phone` are booleans; `skills`,
+   `help_offered`, and `needs` are Postgres text arrays (`{"a","b"}` in CSV).
 
 ## Local development
 
@@ -72,14 +93,13 @@ npm run dev               # http://localhost:5173/registry/
 | `BASE_PATH` | Subpath everything mounts under. Default `/registry`; leave unset locally unless you also change `base` in `frontend/vite.config.js`. |
 | `REGISTRY_AUTH_USER` / `REGISTRY_AUTH_PASSWORD` | The shared login. Any values locally. |
 | `REGISTRY_AUTH_SECRET` | Any string locally. Generate a real one for prod: `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
-| `GOOGLE_SHEET_ID` | The ID in the sheet URL: `.../spreadsheets/d/`**`THIS`**`/edit`. |
-| `GOOGLE_SHEET_RANGE` | The response tab's name, exactly (default `Form Responses 1`). |
-| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | `client_email` from the JSON key. |
-| `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | `private_key` from the JSON key, pasted as-is (keep the `BEGIN`/`END` lines; real newlines or literal `\n` both work). |
+| `SUPABASE_URL` | Project Settings → Data API → Project URL. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Project Settings → API Keys → `service_role` secret. Server-only. |
+| `SUPABASE_MEMBERS_TABLE` | Only if the table isn't named `members`. |
 
 Check <http://localhost:4000/registry/health> → `{"ok":true}`. A `500` from
-`/registry/api/directory` means a `GOOGLE_*` value is off — the server terminal
-shows the real error.
+`/registry/api/directory` means a `SUPABASE_*` value is off or the table name
+doesn't match — the server terminal shows the real error.
 
 ## Deploy to Render
 
@@ -92,10 +112,9 @@ run from here.
 2. In Render: **New → Blueprint**, point it at the repo. It reads
    [`render.yaml`](render.yaml) and creates the `hch-registry` service
    (build `npm run build`, start `npm start`, from `registry/`).
-3. When prompted, set the secrets: `REGISTRY_AUTH_PASSWORD`, `GOOGLE_SHEET_ID`,
-   `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`.
-   `REGISTRY_AUTH_SECRET` is generated; `NODE_ENV`, `BASE_PATH`,
-   `REGISTRY_AUTH_USER`, and `GOOGLE_SHEET_RANGE` have defaults in the blueprint.
+3. When prompted, set the secrets: `REGISTRY_AUTH_PASSWORD`, `SUPABASE_URL`,
+   `SUPABASE_SERVICE_ROLE_KEY`. `REGISTRY_AUTH_SECRET` is generated; `NODE_ENV`,
+   `BASE_PATH`, and `REGISTRY_AUTH_USER` have defaults in the blueprint.
 4. Deploy. The service answers under `https://<service>.onrender.com/registry`.
    Put it behind the main site's reverse proxy so `hubcityhackers.com/registry/*`
    forwards here **without stripping the prefix** — the app owns the whole
@@ -109,7 +128,7 @@ Notes:
 - Render's free plan sleeps the service after ~15 min idle; the next request
   wakes it (a slow first load).
 - The directory response is cached in memory for 60s, so an edit or deletion in
-  the sheet can take up to a minute to appear.
+  the table can take up to a minute to appear.
 
 ## Integrating into the HCH website repo
 
@@ -135,9 +154,11 @@ Checklist once it's in:
   here (`rootDir: registry`), or copy the service block into the site's own
   blueprint. The build/start commands already scope themselves to this folder.
 - **Env vars** are `REGISTRY_`-prefixed (`REGISTRY_AUTH_USER/PASSWORD/SECRET`)
-  so they don't collide with the host site's own `AUTH_*`. `GOOGLE_*`, `PORT`,
+  so they don't collide with the host site's own `AUTH_*`. `SUPABASE_*`, `PORT`,
   and `NODE_ENV` are unchanged — if the site already sets `NODE_ENV`/`PORT` in a
-  shared environment group, that's fine; they mean the same thing here.
+  shared environment group, that's fine; they mean the same thing here. If the
+  host site also uses Supabase, keep these `SUPABASE_*` values scoped to this
+  service unless both point at the same project.
 - **Node version.** `.node-version` pins 22 and every `package.json` says
   `engines.node >=22`. Match the site's toolchain or bump both together.
 - **Workspaces.** `server/` and `frontend/` are independent packages with their
@@ -151,23 +172,28 @@ Checklist once it's in:
 
 ## How the privacy filtering works
 
-`server/src/transform.js` maps sheet columns by **header text** (the form's
-exact question wording), then `toPublicMember()`:
+`server/src/transform.js` maps table columns to field names via
+`COLUMN_TO_FIELD`, then `toPublicMember()`:
 
-- Everyone who submits is listed — the live form has no "keep me out" option, so
-  submitting is the opt-in.
-- `email` is nulled unless the member answered "Yes, show my email".
-- `phone` is nulled unless they answered "Yes" to the phone question.
+- Every row in the table is listed — there is no "keep me out" column, so being
+  in the table is the opt-in.
+- `email` is nulled unless `show_email` is true.
+- `phone` is nulled unless `show_phone` is true.
 
-**Rewording, adding, or removing a form question breaks its mapping in
-`HEADER_TO_FIELD`** — the field then silently vanishes from the API rather than
-erroring. Keep those keys in sync with the live form.
+**Renaming a column breaks its mapping in `COLUMN_TO_FIELD`** — the field then
+silently vanishes from the API rather than erroring. Keep those keys in sync
+with the table.
 
 ## Not built yet (out of scope for this base)
 
-- Tiered visibility (e.g. an authenticated members-only view) — the form has no
-  opt-out question, so every submitter is public.
+- **Member intake.** The old Google Form that fed the sheet no longer connects
+  to anything. Rows go in through the Supabase dashboard (or whatever you build
+  to write to the table). A public submission form and an "edit my entry" flow
+  are not part of this.
+- Tiered visibility (e.g. an authenticated members-only view) — every row is
+  public.
 - A way to contact someone who hid their email and phone.
 - Splitting a checkbox "Other" free-text answer from real selections — a comma
-  inside an "Other" answer is currently misread as multiple values (`splitList`
-  in `server/src/transform.js`).
+  inside an "Other" answer stored as a plain string is still misread as multiple
+  values (`toList` in `server/src/transform.js`). Native `text[]` columns avoid
+  this.
