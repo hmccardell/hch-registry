@@ -36,12 +36,11 @@ export const config = {
   // Signs session tokens. Changing it logs everyone out.
   authSecret: requireInProd('REGISTRY_AUTH_SECRET', 'dev-insecure-secret-change-me'),
 
-  // The Google Sheet the registry form writes to. If unset, /api/directory
-  // returns a clear 500 (see googleSheets.js) but the rest of the app runs.
-  sheetId: process.env.GOOGLE_SHEET_ID || '',
-  sheetRange: process.env.GOOGLE_SHEET_RANGE || 'Form Responses 1',
-  serviceAccountEmail: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '',
-  // Stored with literal \n (env files can't hold real newlines); unescape here.
-  // A value pasted with real newlines passes through untouched.
-  privateKey: (process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+  // Supabase project that holds the members table. If unset, /api/directory
+  // returns a clear 500 (see supabase.js) but the rest of the app runs.
+  supabaseUrl: process.env.SUPABASE_URL || '',
+  // Service-role key: server-only, bypasses row-level security. Never expose it
+  // to the frontend or commit it.
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  membersTable: process.env.SUPABASE_MEMBERS_TABLE || 'members',
 };

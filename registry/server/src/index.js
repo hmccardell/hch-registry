@@ -4,8 +4,8 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { config } from './config.js';
-import { fetchRawRows } from './googleSheets.js';
-import { buildRecords, toPublicMember } from './transform.js';
+import { fetchMembers } from './supabase.js';
+import { toRecord, toPublicMember } from './transform.js';
 import { verifyCredentials, issueToken, requireAuth } from './auth.js';
 
 const app = express();
@@ -46,8 +46,8 @@ registry.get('/api/directory', requireAuth, async (req, res) => {
     if (cache.data && Date.now() < cache.expiresAt) {
       return res.json(cache.data);
     }
-    const rows = await fetchRawRows();
-    const members = buildRecords(rows).map(toPublicMember).filter(Boolean);
+    const rows = await fetchMembers();
+    const members = rows.map(toRecord).map(toPublicMember).filter(Boolean);
     cache = { data: members, expiresAt: Date.now() + CACHE_TTL_MS };
     res.json(members);
   } catch (err) {
