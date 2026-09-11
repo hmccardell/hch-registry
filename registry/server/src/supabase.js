@@ -40,17 +40,54 @@ export async function memberExistsByEmail(email) {
   return (data || []).length > 0;
 }
 
-// Returns the raw member rows straight from the table. Privacy filtering happens
-// downstream in transform.js — nothing here decides what is public.
+// Returns the raw member rows straight from the table, excluding anyone who
+// hasn't published a profile yet (an admin-added, email-only row). Privacy
+// filtering of *which columns* show happens downstream in transform.js — this
+// only decides which *rows* are public at all.
 export async function fetchMembers() {
   assertConfigured();
-  const supabase = getClient();
-  const { data, error } = await supabase
+  const { data, error } = await getClient()
     .from(config.membersTable)
     .select('*')
+    .eq('published', true)
     .order('created_at', { ascending: true });
   if (error) {
     throw new Error(`Supabase query failed: ${error.message}`);
   }
   return data || [];
+}
+
+// The one row a signed-in member is allowed to see or change — their own,
+// looked up by the email on their session, never by an id the client supplies.
+export async function fetchMemberByEmail(email) {
+  assertConfigured();
+  const literal = String(email).replace(/([\\%_])/g, '\\$1');
+  const { data, error } = await getClient()
+    .from(config.membersTable)
+    .select('*')
+    .ilike('email', literal)
+    .limit(1);
+  if (error) {
+    throw new Error(`Supabase query failed: ${error.message}`);
+  }
+  return (data || [])[0] || null;
+}
+
+// Writes `columns` (already whitelisted by transform.js's sanitizeProfileInput)
+// onto the row matching `email`, and nothing else — the update is scoped by the
+// same email the request was authenticated as, so it can only ever touch one
+// member's own row.
+export async function updateMemberByEmail(email, columns) {
+  assertConfigured();
+  const literal = String(email).replace(/([\\%_])/g, '\\$1');
+  const { data, error } = await getClient()
+    .from(config.membersTable)
+    .update(columns)
+    .ilike('email', literal)
+    .select('*')
+    .limit(1);
+  if (error) {
+    throw new Error(`Supabase query failed: ${error.message}`);
+  }
+  return (data || [])[0] || null;
 }

@@ -14,11 +14,17 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
+    // Fail instead of silently hopping to 5174+ — magic links and the API
+    // proxy assume this port.
+    strictPort: true,
     // Forward API calls to the local Express server so the browser stays
     // single-origin, matching production where the server serves this app.
     // The server also mounts its routes under BASE_PATH, so proxy that prefix.
     proxy: {
-      [`${BASE_PATH}api`]: 'http://localhost:4000',
+      [`${BASE_PATH}api`]: {
+        target: 'http://127.0.0.1:4000',
+        changeOrigin: false,
+      },
     },
   },
 });

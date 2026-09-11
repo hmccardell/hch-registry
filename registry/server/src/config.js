@@ -34,6 +34,11 @@ export const config = {
   // derived from the incoming request's own origin. No trailing slash.
   publicUrl: (process.env.PUBLIC_URL || '').replace(/\/$/, ''),
 
+  // Where Vite serves the app during local development. Sign-in redirects and
+  // printed magic links must point here — Express on PORT does not serve the
+  // SPA unless frontend/dist exists (production). No trailing slash.
+  devFrontendUrl: (process.env.DEV_FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, ''),
+
   // Signs both the emailed magic-link tokens and the Bearer session tokens.
   // Changing it invalidates every outstanding link and logs everyone out.
   authSecret: requireInProd('REGISTRY_AUTH_SECRET', 'dev-insecure-secret-change-me'),

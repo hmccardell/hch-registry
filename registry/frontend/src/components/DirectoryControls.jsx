@@ -43,13 +43,13 @@ export default function DirectoryControls({
         </div>
         <div className="flex flex-wrap gap-2">
           <FilterMenu
-            label="Skills"
+            label="Help"
             options={skillOptions}
             selected={skillFilters}
             onChange={onSkillFiltersChange}
           />
           <FilterMenu
-            label="Can help with"
+            label="Offers"
             options={helpOptions}
             selected={helpFilters}
             onChange={onHelpFiltersChange}

@@ -1,26 +1,5 @@
 import Chip from './Chip.jsx';
-import ProjectStage from './ProjectStage.jsx';
 import { CopyEmailButton, DiscordCopyButton, PhoneButton } from './ContactButtons.jsx';
-
-function toHref(url) {
-  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
-}
-
-function ArrowIcon(props) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.7}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
-      <path d="M7 17L17 7M9 7h8v8" />
-    </svg>
-  );
-}
 
 function initials(name) {
   return name
@@ -76,29 +55,6 @@ export default function MemberRow({ member, onOpen }) {
           <Chip key={skill}>{skill}</Chip>
         ))}
       </div>
-
-      {member.projectName && (
-        <>
-          <div className="hidden w-px self-stretch bg-hch-border sm:block" />
-          <div className="flex w-full flex-none items-center gap-2 sm:w-52">
-            <ProjectStage stage={member.projectStage} />
-            <span className="min-w-0 flex-1 truncate text-xs font-medium text-hch-muted-1">{member.projectName}</span>
-            {member.projectLink && (
-              <a
-                href={toHref(member.projectLink)}
-                target="_blank"
-                rel="noopener"
-                onClick={(e) => e.stopPropagation()}
-                title={`Open ${member.projectName}`}
-                aria-label={`Open ${member.projectName} in a new tab`}
-                className="flex h-6 w-6 flex-none items-center justify-center rounded-md text-hch-muted-2 transition-colors hover:bg-hch-border/40 hover:text-hch-mint-dark"
-              >
-                <ArrowIcon className="h-3.5 w-3.5" />
-              </a>
-            )}
-          </div>
-        </>
-      )}
     </div>
   );
 }

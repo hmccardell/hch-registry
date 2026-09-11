@@ -41,21 +41,33 @@ server-only secret that bypasses row-level security. The table stays private
      show_email    boolean not null default false,
      show_phone    boolean not null default false,
      discord_handle text,
-     links         text,
+     website       text,
+     github        text,
+     linkedin      text,
      skills        text[] not null default '{}',
-     project_name  text,
-     project_description text,
-     project_stage text,
-     project_link  text,
      help_offered  text[] not null default '{}',
      needs         text[] not null default '{}',
      needs_detail  text,
-     bio           text
+     bio           text,
+     published     boolean not null default false
    );
+
+   -- One row per address, case-insensitively — this is the sign-in key.
+   create unique index members_email_lower_key on members (lower(email));
 
    alter table members enable row level security;
    -- No policies: the service-role key (server only) still has full access;
    -- the anon/public key gets nothing.
+   ```
+
+   If the table already exists from an earlier schema, add the new link columns
+   (leave unused `links` / `project_*` columns in place until you migrate them):
+
+   ```sql
+   alter table members
+     add column if not exists website text,
+     add column if not exists github text,
+     add column if not exists linkedin text;
    ```
 
 2. **Grab the credentials.** *Project Settings → Data API* → copy the **Project
@@ -64,27 +76,49 @@ server-only secret that bypasses row-level security. The table stays private
 
 3. **Load the data.** Import existing members via the dashboard's **Table
    Editor → Insert → Import data from CSV**, or paste `insert` statements in the
-   SQL Editor. `show_email` / `show_phone` are booleans; `skills`,
-   `help_offered`, and `needs` are Postgres text arrays (`{"a","b"}` in CSV).
+   SQL Editor. `show_email` / `show_phone` and `published` are booleans;
+   `skills`, `help_offered`, and `needs` are Postgres text arrays (`{"a","b"}`
+   in CSV). Set `published = true` on rows that should appear in the directory
+   immediately — see [Adding a member](#adding-a-member) for the normal path.
+
+## Adding a member
+
+Adding someone is a one-field insert — save this as a SQL Editor **snippet**
+("Add member") and just edit the email each time:
+
+```sql
+insert into members (email)
+values (lower(trim('PASTE_EMAIL_HERE')))
+returning id, email, created_at;
+```
+
+That's the entire admin action. The person can request a sign-in link right
+away; they land on an empty profile (`/#/profile`) and fill in their own name,
+skills, bio, etc. They won't show up in the public directory until they save
+their profile with **"List me in the public directory"** checked — see
+[How self-service profiles work](#how-self-service-profiles-work). Removing
+someone is `delete from members where email = '...'`.
 
 ## Local development
 
-Two terminals. Vite serves the app under `/registry/` and proxies `/registry/api`
-to the server, so both sides run on one origin (matching production) and there is
-no CORS or frontend env to set.
+Use **http://localhost:5173/registry/** — Vite is the app. Express on `:4000`
+is API-only; Vite proxies `/registry/api` there. Opening `:4000` in a browser
+redirects to Vite so sign-in links don't dump you on a dead port.
 
 ```bash
-# terminal 1 — server
-cd server
-cp .env.example .env      # then fill it in (table below)
-npm install
-npm run dev               # http://localhost:4000/registry
-
-# terminal 2 — frontend
-cd frontend
-npm install
-npm run dev               # http://localhost:5173/registry/
+cd registry
+cp server/.env.example server/.env   # then fill it in (table below)
+npm run install:all
+npm run dev                          # API :4000 + app :5173
 ```
+
+Or two terminals (`npm run dev` in `server/` and `frontend/`) if you prefer
+the logs split. Either way, stay on `:5173`. Vite uses `strictPort`, so if
+5173 is already taken, kill the leftover process instead of hopping ports.
+
+With `SMTP_URL` unset, submitting the login form follows the magic-link
+callback in the same tab (no copying a URL out of the server log). The
+server still prints the link if you need it.
 
 `server/.env`:
 
@@ -92,7 +126,7 @@ npm run dev               # http://localhost:5173/registry/
 | --- | --- |
 | `PORT` | `4000` unless taken. |
 | `BASE_PATH` | Subpath everything mounts under. Default `/registry`; leave unset locally unless you also change `base` in `frontend/vite.config.js`. |
-| `PUBLIC_URL` | Leave unset locally — the sign-in link is built from the request origin. |
+| `PUBLIC_URL` | Leave unset locally — sign-in links go to Vite (`DEV_FRONTEND_URL`). |
 | `REGISTRY_AUTH_SECRET` | Any string locally. Generate a real one for prod: `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
 | `SMTP_URL` | Leave unset locally — sign-in links print to the server terminal instead of being emailed. |
 | `MAIL_FROM` | Only matters once `SMTP_URL` is set. |
@@ -100,8 +134,9 @@ npm run dev               # http://localhost:5173/registry/
 | `SUPABASE_SERVICE_ROLE_KEY` | Project Settings → API Keys → `service_role` secret. Server-only. |
 | `SUPABASE_MEMBERS_TABLE` | Only if the table isn't named `members`. |
 
-To sign in locally: enter an email that exists in the `members` table, then open
-the link the **server terminal** prints (`[mailer] dev mode — sign-in link…`).
+To sign in locally: enter an email that exists in the `members` table. The
+browser should bounce through the callback and land you in the app. If it
+doesn't, the server terminal still prints `[mailer] dev mode — sign-in link…`.
 
 Check <http://localhost:4000/registry/health> → `{"ok":true}`. A `500` from
 `/registry/api/directory` means a `SUPABASE_*` value is off or the table name
@@ -205,6 +240,29 @@ Magic-link and session tokens are both HMAC-signed with `REGISTRY_AUTH_SECRET`
 but domain-separated by a label, so one can't be replayed as the other. The
 single-use `jti` set is in-memory — fine for one instance, not for several.
 
+## How self-service profiles work
+
+An admin only ever provides an email ([Adding a member](#adding-a-member)); the
+member fills in the rest themselves at `/#/profile`.
+
+- **`GET /api/me`** ([`index.js`](server/src/index.js)) returns the signed-in
+  member's own row, unredacted. It's found by `req.user.email` — the email
+  `requireAuth` already pulled out of the session token — never by an id the
+  client sends, so there is no way to ask for someone else's row.
+- **`PATCH /api/me`** writes an update to that same row. The request body is
+  passed through `sanitizeProfileInput()`
+  ([`transform.js`](server/src/transform.js)) first, which keeps only a fixed
+  whitelist of profile fields (name, phone, website / GitHub / LinkedIn, skills,
+  bio, the `show_email` / `show_phone` / `published` toggles, …) and coerces
+  each to the right type. Anything else in the body — `email`, `id`, or a field
+  that doesn't exist — is silently dropped rather than reaching the database.
+  **`email` is never writable through this endpoint**; it's the sign-in key; a
+  member can't quietly redirect their own login target through a profile edit.
+- **`published`** gates the *row*, separately from `show_email` / `show_phone`,
+  which gate *columns* on rows that are already visible. A bare, admin-added
+  row defaults to `published = false` and is invisible in `/api/directory`
+  until the member saves their profile with that box checked.
+
 ## How the privacy filtering works
 
 `server/src/transform.js` maps table columns to field names via
@@ -221,13 +279,17 @@ with the table.
 
 ## Not built yet (out of scope for this base)
 
-- **Member intake.** The old Google Form that fed the sheet no longer connects
-  to anything. Rows go in through the Supabase dashboard (or whatever you build
-  to write to the table). A public submission form and an "edit my entry" flow
-  are not part of this.
-- **Registration / approval.** Adding someone is a manual table insert. There's
-  no "apply → an admin approves → you can now sign in" flow, no admin UI, and no
-  way for a member to change the email they sign in with.
+- **Public intake / approval queue.** Adding a member is still a manual insert
+  by someone with SQL Editor access ([Adding a member](#adding-a-member)) — there
+  is no public "apply" form and no admin approval UI; the old Google Form that
+  fed the original sheet no longer connects to anything.
+- **Changing your own email.** Self-service editing covers every other field
+  (see [How self-service profiles work](#how-self-service-profiles-work)), but
+  not the email itself — that's the sign-in key, so changing it needs more care
+  (verifying the new address before it takes effect) than a plain field edit.
+- **An admin role / admin UI.** Every signed-in member can edit only their own
+  row; there's no `is_admin` flag or admin-only view (e.g. a list of
+  unpublished / newly added members) — that's still the SQL Editor.
 - **Sign-in hardening.** The single-use link guard (`jti`) is in-memory, so it
   resets on redeploy and doesn't hold across multiple instances — a shared store
   (Redis, or a Supabase table) is needed for that. The session token also rides

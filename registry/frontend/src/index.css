@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
-/* Colors pulled from hubcityhackers.com's live site (header/ink, page bg, and accent mint/green). */
-/* Light-only app. Paint the page surface (html/body) cream so a phone in dark
+/* Palette copied from hubcityhackers.com's live stylesheet:
+   --paper #fbfbf8, --ink #010023, --signal #11ffb1, --muted #5b5a70.
+   Light-only app. Paint the page surface (html/body) cream so a phone in dark
    mode never shows a dark backdrop behind the layout, in overscroll gaps, or
    before React mounts. */
 :root {
@@ -10,6 +11,13 @@
 html,
 body {
   background-color: var(--color-hch-cream, #fbfbf8);
+  font-family:
+    'Inter',
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
 @theme {
@@ -22,24 +30,215 @@ body {
   --color-hch-muted-2: #85849a;
   --color-hch-muted-3: #a6a5b8;
   --color-hch-border: #cbcbd5;
+  --color-hch-rule: #01002329;
+  --color-hch-error: #9b1515;
+  --color-hch-success: #006c49;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-hch-mono:
+    'Nimbus Mono PS', 'Liberation Mono', 'Courier New', ui-monospace, monospace;
 }
 
-/* Old-school Windows indeterminate progress bar, in green. Shown on the login
-   screen while a cold-started (sleeping) server wakes up. */
+/* Tint native checkboxes/radios with the brand signal mint instead of the
+   browser default blue, everywhere in the app, without needing custom markup. */
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--color-hch-mint, #11ffb1);
+}
+
+/* Soft, colored shadow used behind primary cards/buttons for depth that
+   still reads as "mint" rather than a generic gray drop shadow. */
+.hch-shadow-card {
+  box-shadow:
+    0 1px 2px rgba(1, 0, 35, 0.04),
+    0 12px 32px -16px rgba(1, 0, 35, 0.18);
+}
+.hch-shadow-btn {
+  box-shadow:
+    0 1px 2px rgba(0, 109, 75, 0.15),
+    0 8px 20px -6px rgba(0, 109, 75, 0.45);
+}
+
+/* Form chrome matching hubcityhackers.com's signup: 2px ink borders, offset
+   shadows, signal-mint fills, square corners, mono labels. */
+.hch-form {
+  font-family: 'Nimbus Mono PS', 'Liberation Mono', 'Courier New', ui-monospace, monospace;
+}
+.hch-form ::selection {
+  color: var(--color-hch-ink);
+  background: var(--color-hch-mint);
+}
+
+.hch-grid-page {
+  position: relative;
+  background-color: var(--color-hch-cream);
+}
+.hch-grid-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(42rem 22rem at 50% 12%, rgba(17, 255, 177, 0.18), transparent 70%);
+}
+.hch-grid-page > * {
+  position: relative;
+  z-index: 1;
+}
+
+.hch-form-card {
+  background: var(--color-hch-cream);
+  border: 2px solid var(--color-hch-ink);
+  box-shadow: 6px 6px 0 var(--color-hch-ink);
+  padding: 1.25rem;
+}
+@media (min-width: 640px) {
+  .hch-form-card {
+    padding: 1.5rem;
+  }
+}
+@media (width <= 800px) {
+  .hch-form-card {
+    box-shadow: 4px 4px 0 var(--color-hch-ink);
+  }
+}
+
+.hch-form-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.86rem;
+  font-weight: 900;
+  line-height: 1.2;
+  text-transform: lowercase;
+  color: var(--color-hch-ink);
+}
+
+.hch-form-hint {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-hch-muted-1);
+}
+
+.hch-form-input {
+  width: 100%;
+  border: 2px solid var(--color-hch-ink);
+  border-radius: 0;
+  background: var(--color-hch-cream);
+  color: var(--color-hch-ink);
+  padding: 0.85rem 1rem;
+  font-size: 0.92rem;
+  font-family:
+    'Inter',
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
+  outline: none;
+}
+.hch-form-input:focus {
+  box-shadow: inset 0 -4px 0 var(--color-hch-mint);
+}
+
+.hch-form-btn,
+.hch-form-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 2px solid var(--color-hch-ink);
+  font-weight: 900;
+  font-size: 0.88rem;
+  line-height: 1;
+  text-transform: lowercase;
+  cursor: pointer;
+  transition:
+    transform 0.16s,
+    box-shadow 0.16s,
+    background-color 0.16s;
+}
+.hch-form-btn {
+  width: 100%;
+  min-height: 3.25rem;
+  padding: 0 1.125rem;
+  background: var(--color-hch-mint);
+  color: var(--color-hch-ink);
+  box-shadow: 3px 3px 0 var(--color-hch-ink);
+}
+.hch-form-btn-ghost {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.85rem;
+  background: var(--color-hch-cream);
+  color: var(--color-hch-ink);
+  box-shadow: 3px 3px 0 var(--color-hch-ink);
+}
+.hch-form-btn:hover:not(:disabled),
+.hch-form-btn-ghost:hover:not(:disabled) {
+  box-shadow: 2px 2px 0 var(--color-hch-ink);
+  transform: translate(1px, 1px);
+}
+.hch-form-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  transform: none;
+  box-shadow: 3px 3px 0 var(--color-hch-ink);
+}
+
+.hch-form-check {
+  display: flex;
+  cursor: pointer;
+  align-items: center;
+  gap: 0.5rem;
+  border: 2px solid var(--color-hch-ink);
+  background: var(--color-hch-cream);
+  padding: 0.45rem 0.65rem;
+  font-size: 0.86rem;
+  color: var(--color-hch-ink);
+  transition: background-color 0.16s;
+}
+.hch-form-check.is-checked {
+  background: var(--color-hch-mint);
+  font-weight: 900;
+}
+
+.hch-form-toggle {
+  position: relative;
+  display: inline-flex;
+  height: 1.75rem;
+  width: 2.85rem;
+  flex-shrink: 0;
+  align-items: center;
+  border: 2px solid var(--color-hch-ink);
+  background: var(--color-hch-cream);
+  transition: background-color 0.16s;
+}
+.hch-form-toggle.is-on {
+  background: var(--color-hch-mint);
+}
+.hch-form-toggle__knob {
+  position: absolute;
+  left: 0.15rem;
+  height: 1.1rem;
+  width: 1.1rem;
+  background: var(--color-hch-ink);
+  transition: transform 0.16s;
+}
+.hch-form-toggle.is-on .hch-form-toggle__knob {
+  transform: translateX(1.05rem);
+}
+
+/* Block progress bar shown on the login screen while a cold-started
+   (sleeping) server wakes up — same ink/mint language as the form. */
 .retro-progress {
   height: 22px;
   padding: 3px;
-  background: #c0c0c0;
-  border: 2px solid;
-  border-color: #808080 #ffffff #ffffff #808080; /* sunken bevel */
+  background: var(--color-hch-cream);
+  border: 2px solid var(--color-hch-ink);
 }
 .retro-progress__track {
   position: relative;
   height: 100%;
   overflow: hidden;
-  background: #ffffff;
+  background: var(--color-hch-cream);
 }
-/* A green fill that grows left-to-right in block-sized steps. The repeating
+/* A mint fill that grows left-to-right in block-sized steps. The repeating
    gradient draws the individual blocks; steps() makes the width advance one
    block at a time. It fills over ~16s, then loops. */
 .retro-progress__fill {
@@ -48,7 +247,7 @@ body {
   left: 0;
   height: 100%;
   width: 0;
-  background: repeating-linear-gradient(90deg, #06b025 0 12px, transparent 12px 15px);
+  background: repeating-linear-gradient(90deg, var(--color-hch-mint) 0 12px, transparent 12px 15px);
   animation: retro-progress-fill 16s steps(24) infinite;
 }
 @keyframes retro-progress-fill {
@@ -57,4 +256,14 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .retro-progress__fill { animation-duration: 32s; }
+  .hch-form-btn,
+  .hch-form-btn-ghost,
+  .hch-form-toggle,
+  .hch-form-toggle__knob {
+    transition: none;
+  }
+  .hch-form-btn:hover:not(:disabled),
+  .hch-form-btn-ghost:hover:not(:disabled) {
+    transform: none;
+  }
 }

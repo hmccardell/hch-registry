@@ -4,8 +4,13 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { config } from './config.js';
-import { fetchMembers, memberExistsByEmail } from './supabase.js';
-import { toRecord, toPublicMember } from './transform.js';
+import {
+  fetchMembers,
+  memberExistsByEmail,
+  fetchMemberByEmail,
+  updateMemberByEmail,
+} from './supabase.js';
+import { toRecord, toPublicMember, sanitizeProfileInput } from './transform.js';
 import { issueMagicToken, verifyMagicToken, issueSession, requireAuth } from './auth.js';
 import { sendLoginLink } from './mailer.js';
 
@@ -45,11 +50,19 @@ function consumeLink(jti, exp) {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Browser-facing base URL of the registry. Prefer the configured value; fall
-// back to the request's own origin (correct for local dev, and for prod as long
-// as the proxy passes a truthful Host / X-Forwarded-Proto).
+// Only the production process serves the built SPA. A leftover frontend/dist
+// from `npm run build` must not take over local :4000 — that's what made
+// magic links land on a stale (or empty) origin instead of Vite.
+const clientDir = join(dirname(fileURLToPath(import.meta.url)), '../../frontend/dist');
+const servingStatic = config.isProd && existsSync(clientDir);
+
+// Browser-facing base URL of the registry. Prefer PUBLIC_URL; in local API-only
+// mode (no dist) always use the Vite origin so magic-link callbacks don't land
+// on :4000, which has no UI. Otherwise derive from the request origin.
 function publicBase(req) {
-  return config.publicUrl || `${req.protocol}://${req.get('host')}${config.basePath}`;
+  if (config.publicUrl) return config.publicUrl;
+  if (!servingStatic) return `${config.devFrontendUrl}${config.basePath}`;
+  return `${req.protocol}://${req.get('host')}${config.basePath}`;
 }
 
 // Everything the registry exposes hangs off this router, which is mounted at
@@ -65,17 +78,23 @@ registry.post('/api/auth/request-link', linkLimiter, async (req, res) => {
   if (!EMAIL_RE.test(email)) {
     return res.status(400).json({ error: 'Enter a valid email address.' });
   }
+  let loginUrl;
   try {
     if (await memberExistsByEmail(email)) {
       const token = issueMagicToken(email);
-      const url = `${publicBase(req)}/api/auth/callback?token=${encodeURIComponent(token)}`;
-      await sendLoginLink(email, url);
+      const callback = `/api/auth/callback?token=${encodeURIComponent(token)}`;
+      await sendLoginLink(email, `${publicBase(req)}${callback}`);
+      // Console-mode only: the login page can follow this same-origin path
+      // through Vite's proxy instead of hunting the other terminal for a URL.
+      if (!config.isProd && !config.smtpUrl) {
+        loginUrl = `${config.basePath}${callback}`;
+      }
     }
   } catch (err) {
     console.error('[auth] request-link failed:', err);
     return res.status(503).json({ error: 'Sign-in is temporarily unavailable.' });
   }
-  res.json({ ok: true });
+  res.json({ ok: true, ...(loginUrl ? { loginUrl } : {}) });
 });
 
 // Step 2 — member clicks the emailed link. Verify it, burn it, then bounce to
@@ -106,11 +125,37 @@ registry.get('/api/directory', requireAuth, async (req, res) => {
   }
 });
 
-// In production the built frontend ships inside this same service, so the app
-// is single-origin and needs no CORS config. Locally this directory doesn't
-// exist — Vite serves the frontend on :5173 and proxies the API here.
-const clientDir = join(dirname(fileURLToPath(import.meta.url)), '../../frontend/dist');
-if (existsSync(clientDir)) {
+// A member's own record, unredacted (it's their own email/phone). Looked up by
+// req.user.email — set by requireAuth from the session token — never by
+// anything the client sends, so there is no way to ask for someone else's row.
+registry.get('/api/me', requireAuth, async (req, res) => {
+  try {
+    const row = await fetchMemberByEmail(req.user.email);
+    if (!row) return res.status(404).json({ error: 'No profile found for this account' });
+    res.json(toRecord(row));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to load profile' });
+  }
+});
+
+registry.patch('/api/me', requireAuth, async (req, res) => {
+  const columns = sanitizeProfileInput(req.body);
+  if (Object.keys(columns).length === 0) {
+    return res.status(400).json({ error: 'Nothing to update' });
+  }
+  try {
+    const row = await updateMemberByEmail(req.user.email, columns);
+    if (!row) return res.status(404).json({ error: 'No profile found for this account' });
+    cache = { data: null, expiresAt: 0 }; // so the edit shows up on the next directory load
+    res.json(toRecord(row));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to save profile' });
+  }
+});
+
+if (servingStatic) {
   registry.use(express.static(clientDir));
   registry.use((req, res) => {
     // req.path here is already stripped of config.basePath by the mount.
@@ -118,6 +163,13 @@ if (existsSync(clientDir)) {
       return res.status(404).json({ error: 'Not found' });
     }
     res.sendFile(join(clientDir, 'index.html'));
+  });
+} else {
+  // Local API-only mode: send browser navigations to Vite so opening :4000
+  // doesn't look like a dead server.
+  registry.use((req, res, next) => {
+    if (req.path.startsWith('/api') || req.path === '/health') return next();
+    res.redirect(302, `${config.devFrontendUrl}${req.originalUrl}`);
   });
 }
 
@@ -128,7 +180,13 @@ app.use(config.basePath, registry);
 app.get('/', (req, res) => res.redirect(`${config.basePath}/`));
 
 app.listen(config.port, () => {
-  console.log(
-    `HCH registry server listening on http://localhost:${config.port}${config.basePath}`,
-  );
+  if (servingStatic) {
+    console.log(
+      `HCH registry listening on http://localhost:${config.port}${config.basePath}`,
+    );
+  } else {
+    console.log(
+      `HCH registry API on http://localhost:${config.port}${config.basePath} — open the app at ${config.devFrontendUrl}${config.basePath}/`,
+    );
+  }
 });
